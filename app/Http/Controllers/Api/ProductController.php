@@ -24,15 +24,37 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
-            'is_wedding_special' => 'nullable|boolean'
+            'is_wedding_special' => 'nullable|boolean',
+            'attributes' => 'nullable|array',
+            'attributes.*.name' => 'required|string|max:255',
+            'attributes.*.values' => 'required|array|min:1',
+            'attributes.*.values.*.value' => 'required|string|max:255',
+            'attributes.*.values.*.price_modifier' => 'nullable|numeric'
         ]);
 
         if (empty($validated['slug'])) {
             $validated['slug'] = Str::slug($validated['title']);
         }
 
-        $product = Product::create($validated);
-        return response()->json($product, 201);
+        // Exclude attributes from direct product creation
+        $productData = collect($validated)->except('attributes')->toArray();
+        $product = Product::create($productData);
+
+        if ($request->has('attributes')) {
+            foreach ($request->input('attributes') as $attrData) {
+                $attribute = $product->attributes()->create([
+                    'name' => $attrData['name']
+                ]);
+                foreach ($attrData['values'] as $valData) {
+                    $attribute->values()->create([
+                        'value' => $valData['value'],
+                        'price_modifier' => $valData['price_modifier'] ?? 0.00
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($product->load('attributes.values'), 201);
     }
 
     public function show(Product $product)
@@ -50,15 +72,40 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
-            'is_wedding_special' => 'nullable|boolean'
+            'is_wedding_special' => 'nullable|boolean',
+            'attributes' => 'nullable|array',
+            'attributes.*.name' => 'required|string|max:255',
+            'attributes.*.values' => 'required|array|min:1',
+            'attributes.*.values.*.value' => 'required|string|max:255',
+            'attributes.*.values.*.price_modifier' => 'nullable|numeric'
         ]);
 
-        $product->update($validated);
-        return response()->json($product);
+        $productData = collect($validated)->except('attributes')->toArray();
+        $product->update($productData);
+
+        if ($request->has('attributes')) {
+            // Delete old attributes to rebuild them
+            $product->attributes()->delete();
+
+            foreach ($request->input('attributes') as $attrData) {
+                $attribute = $product->attributes()->create([
+                    'name' => $attrData['name']
+                ]);
+                foreach ($attrData['values'] as $valData) {
+                    $attribute->values()->create([
+                        'value' => $valData['value'],
+                        'price_modifier' => $valData['price_modifier'] ?? 0.00
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($product->load('attributes.values'));
     }
 
     public function destroy(Product $product)
     {
+        $product->attributes()->delete();
         $product->delete();
         return response()->json(['message' => 'Product deleted successfully']);
     }
