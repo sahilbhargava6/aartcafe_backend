@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\PageController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\UploadController;
 
 // ── Website & Product Analytics ──
 Route::get('/analytics/website', [AnalyticsController::class, 'website']);
@@ -17,6 +18,10 @@ Route::get('/analytics/products', [AnalyticsController::class, 'products']);
 // ── Special Filters ──
 Route::get('/products/new-discoveries', [ProductController::class, 'newDiscoveries']);
 Route::get('/products/wedding-specials', [ProductController::class, 'weddingSpecials']);
+
+// ── File Uploads ──
+Route::post('/upload', [UploadController::class, 'store']);
+
 
 // ── CRUD Resources ──
 Route::apiResource('categories', CategoryController::class);
