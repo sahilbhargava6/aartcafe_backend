@@ -137,4 +137,80 @@ class ProductController extends Controller
         $products = Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get();
         return response()->json($products);
     }
+
+    public function bulkImport(Request $request)
+    {
+        $productsData = $request->input('products', []);
+
+        if (empty($productsData) && $request->hasFile('csv_file')) {
+            $path = $request->file('csv_file')->getRealPath();
+            $file = fopen($path, 'r');
+            $header = fgetcsv($file);
+
+            $productsData = [];
+            while (($row = fgetcsv($file)) !== false) {
+                if (count($row) === count($header)) {
+                    $productsData[] = array_combine($header, $row);
+                }
+            }
+            fclose($file);
+        }
+
+        if (empty($productsData)) {
+            return response()->json(['message' => 'No valid product data provided'], 422);
+        }
+
+        $importedCount = 0;
+        $defaultCategory = \App\Models\Category::firstOrCreate(
+            ['name' => 'General'],
+            ['slug' => 'general']
+        );
+
+        foreach ($productsData as $data) {
+            $title = $data['title'] ?? $data['Title'] ?? null;
+            if (!$title) continue;
+
+            $price = floatval($data['base_price'] ?? $data['price'] ?? $data['Price'] ?? 0);
+            $slug = Str::slug($data['slug'] ?? $data['Slug'] ?? $title);
+            
+            // Ensure unique slug
+            $existingCount = Product::where('slug', 'LIKE', "{$slug}%")->count();
+            if ($existingCount > 0) {
+                $slug = "{$slug}-" . ($existingCount + 1);
+            }
+
+            $categoryName = $data['category_name'] ?? $data['category'] ?? $data['Category'] ?? null;
+            $categoryId = $data['category_id'] ?? null;
+
+            if ($categoryName) {
+                $cat = \App\Models\Category::firstOrCreate(
+                    ['name' => trim($categoryName)],
+                    ['slug' => Str::slug(trim($categoryName))]
+                );
+                $categoryId = $cat->id;
+            } elseif (!$categoryId) {
+                $categoryId = $defaultCategory->id;
+            }
+
+            Product::create([
+                'category_id' => $categoryId,
+                'title' => trim($title),
+                'slug' => $slug,
+                'base_price' => $price,
+                'description' => $data['description'] ?? $data['Description'] ?? null,
+                'image' => $data['image'] ?? $data['image_url'] ?? $data['Image'] ?? null,
+                'is_new_discovery' => filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'is_wedding_special' => filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'is_bestseller' => filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'is_hero_featured' => filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            ]);
+
+            $importedCount++;
+        }
+
+        return response()->json([
+            'message' => "Successfully imported {$importedCount} products!",
+            'imported_count' => $importedCount
+        ], 200);
+    }
 }
