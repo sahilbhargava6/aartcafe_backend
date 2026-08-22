@@ -22,6 +22,7 @@ return new class extends Migration
             $table->boolean('is_new_discovery')->default(false);
             $table->boolean('is_wedding_special')->default(false);
             $table->boolean('is_bestseller')->default(false);
+            $table->boolean('is_hero_featured')->default(false);
             $table->timestamps();
         });
     }

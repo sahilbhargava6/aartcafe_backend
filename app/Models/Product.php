@@ -15,13 +15,15 @@ class Product extends Model
         'image',
         'is_new_discovery',
         'is_wedding_special',
-        'is_bestseller'
+        'is_bestseller',
+        'is_hero_featured'
     ];
 
     protected $casts = [
         'is_new_discovery' => 'boolean',
         'is_wedding_special' => 'boolean',
         'is_bestseller' => 'boolean',
+        'is_hero_featured' => 'boolean',
         'base_price' => 'decimal:2'
     ];
 

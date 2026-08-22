@@ -26,6 +26,7 @@ class ProductController extends Controller
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
             'is_bestseller' => 'nullable|boolean',
+            'is_hero_featured' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'required|string|max:255',
             'attributes.*.values' => 'required|array|min:1',
@@ -75,6 +76,7 @@ class ProductController extends Controller
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
             'is_bestseller' => 'nullable|boolean',
+            'is_hero_featured' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'required|string|max:255',
             'attributes.*.values' => 'required|array|min:1',
@@ -127,6 +129,12 @@ class ProductController extends Controller
     public function bestsellers()
     {
         $products = Product::where('is_bestseller', true)->with(['category', 'attributes.values'])->get();
+        return response()->json($products);
+    }
+
+    public function heroFeatured()
+    {
+        $products = Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get();
         return response()->json($products);
     }
 }
