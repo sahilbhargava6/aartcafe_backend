@@ -25,6 +25,7 @@ class ProductController extends Controller
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
+            'is_bestseller' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'required|string|max:255',
             'attributes.*.values' => 'required|array|min:1',
@@ -73,6 +74,7 @@ class ProductController extends Controller
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
+            'is_bestseller' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'required|string|max:255',
             'attributes.*.values' => 'required|array|min:1',
@@ -119,6 +121,12 @@ class ProductController extends Controller
     public function weddingSpecials()
     {
         $products = Product::where('is_wedding_special', true)->with(['category', 'attributes.values'])->get();
+        return response()->json($products);
+    }
+
+    public function bestsellers()
+    {
+        $products = Product::where('is_bestseller', true)->with(['category', 'attributes.values'])->get();
         return response()->json($products);
     }
 }

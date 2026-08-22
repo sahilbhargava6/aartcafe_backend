@@ -18,6 +18,7 @@ Route::get('/analytics/products', [AnalyticsController::class, 'products']);
 // ── Special Filters ──
 Route::get('/products/new-discoveries', [ProductController::class, 'newDiscoveries']);
 Route::get('/products/wedding-specials', [ProductController::class, 'weddingSpecials']);
+Route::get('/products/bestsellers', [ProductController::class, 'bestsellers']);
 
 // ── File Uploads ──
 Route::post('/upload', [UploadController::class, 'store']);
