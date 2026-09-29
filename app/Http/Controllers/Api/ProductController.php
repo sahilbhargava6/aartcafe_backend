@@ -339,12 +339,18 @@ class ProductController extends Controller
                 foreach ($attributeColumnMap as $colHeader => $attrName) {
                     $colValue = $data[$colHeader] ?? null;
                     if (!empty($colValue)) {
-                        $attribute = $currentProduct->attributes()->firstOrCreate(['name' => $attrName]);
-                        
                         // Check if cell contains price rules like "1) With: ₹299 2) Without: ₹249"
                         $lines = array_map('trim', preg_split('/[\n;]+/', $colValue));
                         foreach ($lines as $line) {
                             if (empty($line)) continue;
+
+                            // Clean attribute value label (remove numbers/bullets like "1) ")
+                            $cleanValue = trim(preg_replace('/^\d+[\.\)]\s*/', '', $line));
+                            if (in_array(strtolower($cleanValue), ['na', 'n/a', 'none', '-', 'null', ''])) {
+                                continue; // Skip NA or placeholder values
+                            }
+
+                            $attribute = $currentProduct->attributes()->firstOrCreate(['name' => $attrName]);
 
                             // Parse inline price modifiers e.g. "With: ₹299" or "Without: ₹249" or "With: 499"
                             $priceMod = 0.00;
@@ -358,14 +364,18 @@ class ProductController extends Controller
                                 }
                             }
 
-                            // Clean attribute value label (remove numbers/bullets like "1) ")
-                            $cleanValue = preg_replace('/^\d+[\.\)]\s*/', '', $line);
-
                             $attribute->values()->firstOrCreate(
                                 ['value' => $cleanValue],
                                 ['price_modifier' => $priceMod]
                             );
                         }
+                    }
+                }
+
+                // Delete any attributes that ended up with 0 values
+                foreach ($currentProduct->attributes as $attr) {
+                    if ($attr->values()->count() === 0) {
+                        $attr->delete();
                     }
                 }
             }
