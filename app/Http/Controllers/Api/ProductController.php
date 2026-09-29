@@ -19,10 +19,10 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'nullable|exists:categories,id',
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|unique:products,slug',
-            'base_price' => 'required|numeric|min:0',
+            'base_price' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
@@ -30,9 +30,9 @@ class ProductController extends Controller
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'attributes' => 'nullable|array',
-            'attributes.*.name' => 'required|string|max:255',
-            'attributes.*.values' => 'required|array|min:1',
-            'attributes.*.values.*.value' => 'required|string|max:255',
+            'attributes.*.name' => 'nullable|string|max:255',
+            'attributes.*.values' => 'nullable|array',
+            'attributes.*.values.*.value' => 'nullable|string|max:255',
             'attributes.*.values.*.price_modifier' => 'nullable|numeric'
         ]);
 
@@ -68,10 +68,10 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'category_id' => 'sometimes|required|exists:categories,id',
+            'category_id' => 'nullable|exists:categories,id',
             'title' => 'sometimes|required|string|max:255',
             'slug' => 'sometimes|required|string|unique:products,slug,' . $product->id,
-            'base_price' => 'sometimes|required|numeric|min:0',
+            'base_price' => 'nullable|numeric|min:0',
             'description' => 'nullable|string',
             'image' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
@@ -79,9 +79,9 @@ class ProductController extends Controller
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'attributes' => 'nullable|array',
-            'attributes.*.name' => 'required|string|max:255',
-            'attributes.*.values' => 'required|array|min:1',
-            'attributes.*.values.*.value' => 'required|string|max:255',
+            'attributes.*.name' => 'nullable|string|max:255',
+            'attributes.*.values' => 'nullable|array',
+            'attributes.*.values.*.value' => 'nullable|string|max:255',
             'attributes.*.values.*.price_modifier' => 'nullable|numeric'
         ]);
 
