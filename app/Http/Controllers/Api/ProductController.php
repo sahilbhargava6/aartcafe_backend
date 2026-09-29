@@ -13,13 +13,15 @@ class ProductController extends Controller
 {
     public function index()
     {
-        return response()->json(Product::with(['category', 'attributes.values'])->get());
+        return response()->json(Product::with(['category', 'categories', 'attributes.values'])->get());
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'category_id' => 'nullable|exists:categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:categories,id',
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|unique:products,slug',
             'base_price' => 'nullable|numeric|min:0',
@@ -43,8 +45,21 @@ class ProductController extends Controller
             $validated['slug'] = Str::slug($validated['title']);
         }
 
-        $productData = collect($validated)->except('attributes')->toArray();
+        $categoryIds = $request->input('category_ids', []);
+        if (empty($categoryIds) && !empty($validated['category_id'])) {
+            $categoryIds = [$validated['category_id']];
+        }
+
+        if (!empty($categoryIds)) {
+            $validated['category_id'] = $categoryIds[0];
+        }
+
+        $productData = collect($validated)->except(['attributes', 'category_ids'])->toArray();
         $product = Product::create($productData);
+
+        if (!empty($categoryIds)) {
+            $product->categories()->sync($categoryIds);
+        }
 
         if ($request->has('attributes')) {
             foreach ($request->input('attributes') as $attrData) {
@@ -60,18 +75,20 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load('attributes.values'), 201);
+        return response()->json($product->load(['category', 'categories', 'attributes.values']), 201);
     }
 
     public function show(Product $product)
     {
-        return response()->json($product->load(['category', 'attributes.values', 'reviews']));
+        return response()->json($product->load(['category', 'categories', 'attributes.values', 'reviews']));
     }
 
     public function update(Request $request, Product $product)
     {
         $validated = $request->validate([
             'category_id' => 'nullable|exists:categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:categories,id',
             'title' => 'sometimes|required|string|max:255',
             'slug' => 'sometimes|required|string|unique:products,slug,' . $product->id,
             'base_price' => 'nullable|numeric|min:0',
@@ -91,7 +108,15 @@ class ProductController extends Controller
             'attributes.*.values.*.price_modifier' => 'nullable|numeric'
         ]);
 
-        $productData = collect($validated)->except('attributes')->toArray();
+        $categoryIds = $request->input('category_ids', null);
+        if (is_array($categoryIds)) {
+            if (!empty($categoryIds)) {
+                $validated['category_id'] = $categoryIds[0];
+            }
+            $product->categories()->sync($categoryIds);
+        }
+
+        $productData = collect($validated)->except(['attributes', 'category_ids'])->toArray();
         $product->update($productData);
 
         if ($request->has('attributes')) {
@@ -110,7 +135,7 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load('attributes.values'));
+        return response()->json($product->load(['category', 'categories', 'attributes.values']));
     }
 
     public function destroy(Product $product)
@@ -142,9 +167,9 @@ class ProductController extends Controller
 
     public function showBySlug($slug)
     {
-        $product = Product::where('slug', $slug)->with(['category', 'attributes.values', 'reviews'])->first();
+        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
         if (!$product) {
-            $all = Product::with(['category', 'attributes.values', 'reviews'])->get();
+            $all = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->get();
             $product = $all->first(function ($p) use ($slug) {
                 return Str::slug($p->title) === $slug || $p->slug === $slug || stripos($p->title, str_replace('-', ' ', $slug)) !== false;
             });
