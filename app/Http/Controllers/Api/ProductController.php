@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProductController extends Controller
 {
@@ -38,7 +40,6 @@ class ProductController extends Controller
             $validated['slug'] = Str::slug($validated['title']);
         }
 
-        // Exclude attributes from direct product creation
         $productData = collect($validated)->except('attributes')->toArray();
         $product = Product::create($productData);
 
@@ -88,7 +89,6 @@ class ProductController extends Controller
         $product->update($productData);
 
         if ($request->has('attributes')) {
-            // Delete old attributes to rebuild them
             $product->attributes()->delete();
 
             foreach ($request->input('attributes') as $attrData) {
@@ -116,44 +116,86 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        $products = Product::where('is_new_discovery', true)->with(['category', 'attributes.values'])->get();
-        return response()->json($products);
+        return response()->json(Product::where('is_new_discovery', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function weddingSpecials()
     {
-        $products = Product::where('is_wedding_special', true)->with(['category', 'attributes.values'])->get();
-        return response()->json($products);
+        return response()->json(Product::where('is_wedding_special', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function bestsellers()
     {
-        $products = Product::where('is_bestseller', true)->with(['category', 'attributes.values'])->get();
-        return response()->json($products);
+        return response()->json(Product::where('is_bestseller', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function heroFeatured()
     {
-        $products = Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get();
-        return response()->json($products);
+        return response()->json(Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function bulkImport(Request $request)
     {
         $productsData = $request->input('products', []);
 
-        if (empty($productsData) && $request->hasFile('csv_file')) {
-            $path = $request->file('csv_file')->getRealPath();
-            $file = fopen($path, 'r');
-            $header = fgetcsv($file);
+        // 1. Handle uploaded .xlsx / .xls or .csv file
+        if (empty($productsData) && $request->hasFile('file')) {
+            $file = $request->file('file');
+            $extension = strtolower($file->getClientOriginalExtension());
+            $path = $file->getRealPath();
 
-            $productsData = [];
-            while (($row = fgetcsv($file)) !== false) {
-                if (count($row) === count($header)) {
-                    $productsData[] = array_combine($header, $row);
+            if (in_array($extension, ['xlsx', 'xls', 'csv'])) {
+                try {
+                    $spreadsheet = IOFactory::load($path);
+                    $worksheet = $spreadsheet->getActiveSheet();
+                    $rows = $worksheet->toArray(null, true, true, true);
+
+                    if (!empty($rows)) {
+                        $headerRow = array_shift($rows);
+                        $headers = array_map(fn($h) => trim((string)$h), array_values($headerRow));
+
+                        foreach ($rows as $rowValues) {
+                            $rowArray = array_values($rowValues);
+                            if (count(array_filter($rowArray)) === 0) continue; // Skip empty rows
+
+                            $rowObj = [];
+                            foreach ($headers as $idx => $headerName) {
+                                if (!empty($headerName)) {
+                                    $rowObj[$headerName] = trim((string)($rowArray[$idx] ?? ''));
+                                }
+                            }
+                            $productsData[] = $rowObj;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    return response()->json(['message' => 'Error reading Excel/CSV file: ' . $e->getMessage()], 400);
                 }
             }
-            fclose($file);
+        } elseif (empty($productsData) && $request->hasFile('csv_file')) {
+            $file = $request->file('csv_file');
+            $path = $file->getRealPath();
+            try {
+                $spreadsheet = IOFactory::load($path);
+                $worksheet = $spreadsheet->getActiveSheet();
+                $rows = $worksheet->toArray(null, true, true, true);
+                if (!empty($rows)) {
+                    $headerRow = array_shift($rows);
+                    $headers = array_map(fn($h) => trim((string)$h), array_values($headerRow));
+                    foreach ($rows as $rowValues) {
+                        $rowArray = array_values($rowValues);
+                        if (count(array_filter($rowArray)) === 0) continue;
+                        $rowObj = [];
+                        foreach ($headers as $idx => $headerName) {
+                            if (!empty($headerName)) {
+                                $rowObj[$headerName] = trim((string)($rowArray[$idx] ?? ''));
+                            }
+                        }
+                        $productsData[] = $rowObj;
+                    }
+                }
+            } catch (\Exception $e) {
+                return response()->json(['message' => 'Error reading file: ' . $e->getMessage()], 400);
+            }
         }
 
         if (empty($productsData)) {
@@ -161,55 +203,107 @@ class ProductController extends Controller
         }
 
         $importedCount = 0;
-        $defaultCategory = \App\Models\Category::firstOrCreate(
+        $defaultCategory = Category::firstOrCreate(
             ['name' => 'General'],
             ['slug' => 'general']
         );
 
-        foreach ($productsData as $data) {
-            $title = $data['title'] ?? $data['Title'] ?? null;
-            if (!$title) continue;
+        // Map column header aliases to attribute names
+        $attributeColumnMap = [
+            'Types of designs' => 'Types of designs',
+            'Shapes' => 'Shapes',
+            'Type of filling' => 'Type of filling',
+            'Sizes' => 'Sizes',
+            'Textual Format' => 'Textual Format',
+            'Pictorial Format' => 'Pictorial Format',
+            'Pictoral Format' => 'Pictorial Format',
+            'Choices of Flower' => 'Choices of Flower',
+            'Accessories' => 'Accessories',
+            'Frames' => 'Frames',
+            'Options' => 'Options',
+            'Type of preservation' => 'Type of preservation',
+            'Type of perservation' => 'Type of preservation',
+        ];
 
-            $price = floatval($data['base_price'] ?? $data['price'] ?? $data['Price'] ?? 0);
-            $slug = Str::slug($data['slug'] ?? $data['Slug'] ?? $title);
+        foreach ($productsData as $data) {
+            // Flexible Title extraction
+            $title = $data['Name of the Product'] ?? $data['Product Name'] ?? $data['title'] ?? $data['Title'] ?? null;
+            if (!$title || strlen($title) < 2) continue;
+
+            // Flexible Price extraction (handles ₹ symbol, '₹', 'INR', etc.)
+            $rawPrice = $data['₹'] ?? $data['Price'] ?? $data['base_price'] ?? $data['price'] ?? 0;
+            $cleanPrice = preg_replace('/[^0-9.]/', '', (string)$rawPrice);
+            $price = floatval($cleanPrice ?: 0);
+
+            // Flexible Category & Flags extraction
+            $catField = $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
             
-            // Ensure unique slug
+            // Check for tags inside category text or separate columns
+            $isBestseller = str_ireplace(' ', '', strtolower($catField)) === 'bestseller' ||
+                filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN) ||
+                stripos($catField, 'bestseller') !== false || stripos($catField, 'best seller') !== false;
+
+            $isWeddingSpecial = stripos($catField, 'wedding') !== false ||
+                filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            $isNewDiscovery = stripos($catField, 'new') !== false ||
+                filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            $isHeroFeatured = filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+            // Clean Category name
+            $cleanCategoryName = preg_replace('/(bestseller|best seller|new discovery|wedding special)/i', '', $catField);
+            $cleanCategoryName = trim($cleanCategoryName, " \t\n\r\0\x0B,-");
+            if (empty($cleanCategoryName)) $cleanCategoryName = 'General';
+
+            $cat = Category::firstOrCreate(
+                ['name' => $cleanCategoryName],
+                ['slug' => Str::slug($cleanCategoryName)]
+            );
+
+            // Create Product
+            $slug = Str::slug($title);
             $existingCount = Product::where('slug', 'LIKE', "{$slug}%")->count();
             if ($existingCount > 0) {
                 $slug = "{$slug}-" . ($existingCount + 1);
             }
 
-            $categoryName = $data['category_name'] ?? $data['category'] ?? $data['Category'] ?? null;
-            $categoryId = $data['category_id'] ?? null;
-
-            if ($categoryName) {
-                $cat = \App\Models\Category::firstOrCreate(
-                    ['name' => trim($categoryName)],
-                    ['slug' => Str::slug(trim($categoryName))]
-                );
-                $categoryId = $cat->id;
-            } elseif (!$categoryId) {
-                $categoryId = $defaultCategory->id;
-            }
-
-            Product::create([
-                'category_id' => $categoryId,
+            $product = Product::create([
+                'category_id' => $cat->id,
                 'title' => trim($title),
                 'slug' => $slug,
                 'base_price' => $price,
-                'description' => $data['description'] ?? $data['Description'] ?? null,
-                'image' => $data['image'] ?? $data['image_url'] ?? $data['Image'] ?? null,
-                'is_new_discovery' => filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                'is_wedding_special' => filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                'is_bestseller' => filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                'is_hero_featured' => filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
+                'image' => $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null,
+                'is_new_discovery' => $isNewDiscovery,
+                'is_wedding_special' => $isWeddingSpecial,
+                'is_bestseller' => $isBestseller,
+                'is_hero_featured' => $isHeroFeatured,
             ]);
+
+            // Save custom attributes from columns (Shapes, Sizes, Type of filling, etc.)
+            foreach ($attributeColumnMap as $colHeader => $attrName) {
+                $colValue = $data[$colHeader] ?? null;
+                if (!empty($colValue)) {
+                    $attribute = $product->attributes()->create(['name' => $attrName]);
+                    // Comma or line separated values
+                    $vals = array_map('trim', preg_split('/[,;\n]+/', $colValue));
+                    foreach ($vals as $val) {
+                        if (!empty($val)) {
+                            $attribute->values()->create([
+                                'value' => $val,
+                                'price_modifier' => 0.00
+                            ]);
+                        }
+                    }
+                }
+            }
 
             $importedCount++;
         }
 
         return response()->json([
-            'message' => "Successfully imported {$importedCount} products!",
+            'message' => "Successfully imported {$importedCount} products with custom attributes!",
             'imported_count' => $importedCount
         ], 200);
     }
