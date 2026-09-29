@@ -251,10 +251,15 @@ class ProductController extends Controller
 
             $isHeroFeatured = filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            // Clean Category name
-            $cleanCategoryName = preg_replace('/(bestseller|best seller|new discovery|wedding special)/i', '', $catField);
-            $cleanCategoryName = trim($cleanCategoryName, " \t\n\r\0\x0B,-");
-            if (empty($cleanCategoryName)) $cleanCategoryName = 'General';
+            // Default category to 'General' if no category is provided
+            $cleanCategoryName = 'General';
+            if (!empty($catField)) {
+                $cleaned = preg_replace('/(bestseller|best seller|new discovery|wedding special)/i', '', $catField);
+                $cleaned = trim($cleaned, " \t\n\r\0\x0B,-");
+                if (!empty($cleaned)) {
+                    $cleanCategoryName = $cleaned;
+                }
+            }
 
             $cat = Category::firstOrCreate(
                 ['name' => $cleanCategoryName],
