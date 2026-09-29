@@ -11,6 +11,7 @@ class Product extends Model
         'title',
         'slug',
         'base_price',
+        'discount_price',
         'description',
         'image',
         'images',
@@ -26,7 +27,8 @@ class Product extends Model
         'is_wedding_special' => 'boolean',
         'is_bestseller' => 'boolean',
         'is_hero_featured' => 'boolean',
-        'base_price' => 'decimal:2'
+        'base_price' => 'decimal:2',
+        'discount_price' => 'decimal:2'
     ];
 
     public function category()
