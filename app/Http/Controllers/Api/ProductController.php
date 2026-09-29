@@ -274,13 +274,16 @@ class ProductController extends Controller
                 $slug = "{$slug}-" . ($existingCount + 1);
             }
 
+            $rawImage = $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null;
+            $image = (!empty($rawImage) && filter_var($rawImage, FILTER_VALIDATE_URL)) ? $rawImage : null;
+
             $product = Product::create([
                 'category_id' => $cat->id,
                 'title' => trim($title),
                 'slug' => $slug,
                 'base_price' => $price,
                 'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
-                'image' => $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null,
+                'image' => $image,
                 'is_new_discovery' => $isNewDiscovery,
                 'is_wedding_special' => $isWeddingSpecial,
                 'is_bestseller' => $isBestseller,
