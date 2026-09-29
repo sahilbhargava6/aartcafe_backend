@@ -235,12 +235,12 @@ class ProductController extends Controller
             // Extract prices embedded inside cells (e.g. "1) With: ₹299 2) Without: ₹249" or "₹2999")
             $rowPrice = $data['Price'] ?? $data['₹'] ?? $data['base_price'] ?? $data['price'] ?? null;
             
-            // If Price column is empty in this row, look for ₹ in Textual/Pictoral cells
+            // If Price column is empty in this row, look for numbers in Textual/Pictoral cells
             if (empty($rowPrice)) {
                 $textualCell = $data['Textual Format'] ?? '';
                 $pictoralCell = $data['Pictoral Format'] ?? $data['Pictorial Format'] ?? '';
                 $match = [];
-                if (preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $textualCell, $match) || preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $pictoralCell, $match)) {
+                if (preg_match('/(?:₹|Rs\.?|With|Without)?\s*[:\-]?\s*(\d+)/iu', $textualCell, $match) || preg_match('/(?:₹|Rs\.?|With|Without)?\s*[:\-]?\s*(\d+)/iu', $pictoralCell, $match)) {
                     $rowPrice = $match[1];
                 }
             }
@@ -325,9 +325,9 @@ class ProductController extends Controller
                         foreach ($lines as $line) {
                             if (empty($line)) continue;
 
-                            // Parse inline price modifiers e.g. "With: ₹299" or "Without: ₹249"
+                            // Parse inline price modifiers e.g. "With: ₹299" or "Without: ₹249" or "With: 499"
                             $priceMod = 0.00;
-                            if (preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $line, $priceMatch)) {
+                            if (preg_match('/(?:₹|Rs\.?|With|Without)\s*[:\-]?\s*(\d+)/iu', $line, $priceMatch)) {
                                 $extractedVal = floatval($priceMatch[1]);
                                 // If base_price is 0, use first extracted price as base_price
                                 if ($currentProduct->base_price == 0) {
