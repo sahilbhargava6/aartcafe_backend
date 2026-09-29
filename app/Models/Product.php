@@ -13,6 +13,7 @@ class Product extends Model
         'base_price',
         'description',
         'image',
+        'images',
         'is_new_discovery',
         'is_wedding_special',
         'is_bestseller',
@@ -20,6 +21,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'images' => 'array',
         'is_new_discovery' => 'boolean',
         'is_wedding_special' => 'boolean',
         'is_bestseller' => 'boolean',
