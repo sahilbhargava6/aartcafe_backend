@@ -228,23 +228,31 @@ class ProductController extends Controller
         $currentTitle = null;
         $currentProduct = null;
         $currentCat = $defaultCategory;
-        $currentCatField = 'General';
-        $currentPrice = 0;
 
         foreach ($productsData as $data) {
-            // Check if this row starts a new Product or is a sub-row for merged cells
             $rowTitle = $data['Name of the Product'] ?? $data['Product Name'] ?? $data['title'] ?? $data['Title'] ?? null;
+            
+            // Extract prices embedded inside cells (e.g. "1) With: ₹299 2) Without: ₹249" or "₹2999")
             $rowPrice = $data['Price'] ?? $data['₹'] ?? $data['base_price'] ?? $data['price'] ?? null;
+            
+            // If Price column is empty in this row, look for ₹ in Textual/Pictoral cells
+            if (empty($rowPrice)) {
+                $textualCell = $data['Textual Format'] ?? '';
+                $pictoralCell = $data['Pictoral Format'] ?? $data['Pictorial Format'] ?? '';
+                $match = [];
+                if (preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $textualCell, $match) || preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $pictoralCell, $match)) {
+                    $rowPrice = $match[1];
+                }
+            }
 
             if (!empty($rowTitle) && strlen(trim($rowTitle)) >= 2) {
                 // NEW PRODUCT ROW
                 $currentTitle = trim($rowTitle);
 
-                // Flexible Price extraction
                 $cleanPrice = preg_replace('/[^0-9.]/', '', (string)($rowPrice ?? 0));
-                $currentPrice = floatval($cleanPrice ?: 0);
+                $basePrice = floatval($cleanPrice ?: 0);
 
-                // Flexible Category & Flags extraction
+                // Category & Flags
                 $catField = $data['Category of the Product'] ?? $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
                 $tagsField = $data['also best seller etc'] ?? $data['Tags'] ?? '';
                 $combinedCatTags = $catField . ' ' . $tagsField;
@@ -287,7 +295,7 @@ class ProductController extends Controller
                     'category_id' => $currentCat->id,
                     'title' => $currentTitle,
                     'slug' => $slug,
-                    'base_price' => $currentPrice,
+                    'base_price' => $basePrice,
                     'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
                     'image' => $image,
                     'is_new_discovery' => $isNewDiscovery,
@@ -297,24 +305,45 @@ class ProductController extends Controller
                 ]);
 
                 $importedCount++;
+            } elseif ($currentProduct && !empty($rowPrice) && $currentProduct->base_price == 0) {
+                // Update product base_price if found in a subsequent sub-row (e.g. Calender Frames row 9 ₹2999)
+                $cleanPrice = preg_replace('/[^0-9.]/', '', (string)$rowPrice);
+                if ($cleanPrice > 0) {
+                    $currentProduct->update(['base_price' => floatval($cleanPrice)]);
+                }
             }
 
-            // ATTR & VARIANT VALUES (Works for both the main row AND merged sub-rows!)
+            // PROCESS ATTRIBUTES & PRICE MODIFIERS ACROSS ROWS
             if ($currentProduct) {
                 foreach ($attributeColumnMap as $colHeader => $attrName) {
                     $colValue = $data[$colHeader] ?? null;
                     if (!empty($colValue)) {
                         $attribute = $currentProduct->attributes()->firstOrCreate(['name' => $attrName]);
-                        // Comma, slash, or line separated values
-                        $vals = array_map('trim', preg_split('/[,;\n]+/', $colValue));
-                        foreach ($vals as $val) {
-                            if (!empty($val)) {
-                                $attribute->values()->firstOrCreate([
-                                    'value' => $val
-                                ], [
-                                    'price_modifier' => 0.00
-                                ]);
+                        
+                        // Check if cell contains price rules like "1) With: ₹299 2) Without: ₹249"
+                        $lines = array_map('trim', preg_split('/[\n;]+/', $colValue));
+                        foreach ($lines as $line) {
+                            if (empty($line)) continue;
+
+                            // Parse inline price modifiers e.g. "With: ₹299" or "Without: ₹249"
+                            $priceMod = 0.00;
+                            if (preg_match('/(?:₹|Rs\.?)\s*(\d+)/i', $line, $priceMatch)) {
+                                $extractedVal = floatval($priceMatch[1]);
+                                // If base_price is 0, use first extracted price as base_price
+                                if ($currentProduct->base_price == 0) {
+                                    $currentProduct->update(['base_price' => $extractedVal]);
+                                } else {
+                                    $priceMod = max(0, $extractedVal - $currentProduct->base_price);
+                                }
                             }
+
+                            // Clean attribute value label (remove numbers/bullets like "1) ")
+                            $cleanValue = preg_replace('/^\d+[\.\)]\s*/', '', $line);
+
+                            $attribute->values()->firstOrCreate(
+                                ['value' => $cleanValue],
+                                ['price_modifier' => $priceMod]
+                            );
                         }
                     }
                 }
