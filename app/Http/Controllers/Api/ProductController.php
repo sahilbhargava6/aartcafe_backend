@@ -236,17 +236,18 @@ class ProductController extends Controller
             $price = floatval($cleanPrice ?: 0);
 
             // Flexible Category & Flags extraction
-            $catField = $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
+            $catField = $data['Category of the Product'] ?? $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
+            $tagsField = $data['also best seller etc'] ?? $data['Tags'] ?? '';
+            $combinedCatTags = $catField . ' ' . $tagsField;
             
             // Check for tags inside category text or separate columns
-            $isBestseller = str_ireplace(' ', '', strtolower($catField)) === 'bestseller' ||
-                filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN) ||
-                stripos($catField, 'bestseller') !== false || stripos($catField, 'best seller') !== false;
+            $isBestseller = filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN) ||
+                stripos($combinedCatTags, 'bestseller') !== false || stripos($combinedCatTags, 'best seller') !== false;
 
-            $isWeddingSpecial = stripos($catField, 'wedding') !== false ||
+            $isWeddingSpecial = stripos($combinedCatTags, 'wedding') !== false ||
                 filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            $isNewDiscovery = stripos($catField, 'new') !== false ||
+            $isNewDiscovery = stripos($combinedCatTags, 'new') !== false ||
                 filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
             $isHeroFeatured = filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN);
