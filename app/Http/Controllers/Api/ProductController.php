@@ -138,6 +138,23 @@ class ProductController extends Controller
         return response()->json(Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
     }
 
+    public function showBySlug($slug)
+    {
+        $product = Product::where('slug', $slug)->with(['category', 'attributes.values', 'reviews'])->first();
+        if (!$product) {
+            $all = Product::with(['category', 'attributes.values', 'reviews'])->get();
+            $product = $all->first(function ($p) use ($slug) {
+                return Str::slug($p->title) === $slug || $p->slug === $slug || stripos($p->title, str_replace('-', ' ', $slug)) !== false;
+            });
+        }
+
+        if (!$product) {
+            return response()->json(['message' => 'Product not found'], 404);
+        }
+
+        return response()->json($product);
+    }
+
     public function bulkImport(Request $request)
     {
         $productsData = $request->input('products', []);

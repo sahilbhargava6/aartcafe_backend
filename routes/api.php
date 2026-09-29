@@ -20,6 +20,7 @@ Route::get('/products/new-discoveries', [ProductController::class, 'newDiscoveri
 Route::get('/products/wedding-specials', [ProductController::class, 'weddingSpecials']);
 Route::get('/products/bestsellers', [ProductController::class, 'bestsellers']);
 Route::get('/products/hero-featured', [ProductController::class, 'heroFeatured']);
+Route::get('/products/slug/{slug}', [ProductController::class, 'showBySlug']);
 Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
 
 // ── File Uploads ──
