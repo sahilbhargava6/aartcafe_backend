@@ -15,6 +15,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        User::firstOrCreate(
+            ['email' => 'admin@aartcafe.com'],
+            [
+                'name' => 'Aartcafe Admin',
+                'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
+            ]
+        );
+
         $this->call(DashboardSeeder::class);
     }
 }
