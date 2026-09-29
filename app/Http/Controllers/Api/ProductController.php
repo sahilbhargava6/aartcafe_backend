@@ -225,90 +225,100 @@ class ProductController extends Controller
             'Type of perservation' => 'Type of preservation',
         ];
 
+        $currentTitle = null;
+        $currentProduct = null;
+        $currentCat = $defaultCategory;
+        $currentCatField = 'General';
+        $currentPrice = 0;
+
         foreach ($productsData as $data) {
-            // Flexible Title extraction
-            $title = $data['Name of the Product'] ?? $data['Product Name'] ?? $data['title'] ?? $data['Title'] ?? null;
-            if (!$title || strlen($title) < 2) continue;
+            // Check if this row starts a new Product or is a sub-row for merged cells
+            $rowTitle = $data['Name of the Product'] ?? $data['Product Name'] ?? $data['title'] ?? $data['Title'] ?? null;
+            $rowPrice = $data['Price'] ?? $data['₹'] ?? $data['base_price'] ?? $data['price'] ?? null;
 
-            // Flexible Price extraction (handles ₹ symbol, '₹', 'INR', etc.)
-            $rawPrice = $data['₹'] ?? $data['Price'] ?? $data['base_price'] ?? $data['price'] ?? 0;
-            $cleanPrice = preg_replace('/[^0-9.]/', '', (string)$rawPrice);
-            $price = floatval($cleanPrice ?: 0);
+            if (!empty($rowTitle) && strlen(trim($rowTitle)) >= 2) {
+                // NEW PRODUCT ROW
+                $currentTitle = trim($rowTitle);
 
-            // Flexible Category & Flags extraction
-            $catField = $data['Category of the Product'] ?? $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
-            $tagsField = $data['also best seller etc'] ?? $data['Tags'] ?? '';
-            $combinedCatTags = $catField . ' ' . $tagsField;
-            
-            // Check for tags inside category text or separate columns
-            $isBestseller = filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN) ||
-                stripos($combinedCatTags, 'bestseller') !== false || stripos($combinedCatTags, 'best seller') !== false;
+                // Flexible Price extraction
+                $cleanPrice = preg_replace('/[^0-9.]/', '', (string)($rowPrice ?? 0));
+                $currentPrice = floatval($cleanPrice ?: 0);
 
-            $isWeddingSpecial = stripos($combinedCatTags, 'wedding') !== false ||
-                filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                // Flexible Category & Flags extraction
+                $catField = $data['Category of the Product'] ?? $data['Category of the Product, also best seller etc'] ?? $data['Category'] ?? $data['category'] ?? 'General';
+                $tagsField = $data['also best seller etc'] ?? $data['Tags'] ?? '';
+                $combinedCatTags = $catField . ' ' . $tagsField;
 
-            $isNewDiscovery = stripos($combinedCatTags, 'new') !== false ||
-                filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $isBestseller = filter_var($data['is_bestseller'] ?? $data['Is Bestseller'] ?? false, FILTER_VALIDATE_BOOLEAN) ||
+                    stripos($combinedCatTags, 'bestseller') !== false || stripos($combinedCatTags, 'best seller') !== false;
 
-            $isHeroFeatured = filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $isWeddingSpecial = stripos($combinedCatTags, 'wedding') !== false ||
+                    filter_var($data['is_wedding_special'] ?? $data['Is Wedding Special'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            // Default category to 'General' if no category is provided
-            $cleanCategoryName = 'General';
-            if (!empty($catField)) {
-                $cleaned = preg_replace('/(bestseller|best seller|new discovery|wedding special)/i', '', $catField);
-                $cleaned = trim($cleaned, " \t\n\r\0\x0B,-");
-                if (!empty($cleaned)) {
-                    $cleanCategoryName = $cleaned;
+                $isNewDiscovery = stripos($combinedCatTags, 'new') !== false ||
+                    filter_var($data['is_new_discovery'] ?? $data['Is New Discovery'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                $isHeroFeatured = filter_var($data['is_hero_featured'] ?? $data['Is Hero Featured'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                $cleanCategoryName = 'General';
+                if (!empty($catField)) {
+                    $cleaned = preg_replace('/(bestseller|best seller|new discovery|wedding special)/i', '', $catField);
+                    $cleaned = trim($cleaned, " \t\n\r\0\x0B,-");
+                    if (!empty($cleaned)) {
+                        $cleanCategoryName = $cleaned;
+                    }
                 }
+
+                $currentCat = Category::firstOrCreate(
+                    ['name' => $cleanCategoryName],
+                    ['slug' => Str::slug($cleanCategoryName)]
+                );
+
+                $slug = Str::slug($currentTitle);
+                $existingCount = Product::where('slug', 'LIKE', "{$slug}%")->count();
+                if ($existingCount > 0) {
+                    $slug = "{$slug}-" . ($existingCount + 1);
+                }
+
+                $rawImage = $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null;
+                $image = (!empty($rawImage) && filter_var($rawImage, FILTER_VALIDATE_URL)) ? $rawImage : null;
+
+                $currentProduct = Product::create([
+                    'category_id' => $currentCat->id,
+                    'title' => $currentTitle,
+                    'slug' => $slug,
+                    'base_price' => $currentPrice,
+                    'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
+                    'image' => $image,
+                    'is_new_discovery' => $isNewDiscovery,
+                    'is_wedding_special' => $isWeddingSpecial,
+                    'is_bestseller' => $isBestseller,
+                    'is_hero_featured' => $isHeroFeatured,
+                ]);
+
+                $importedCount++;
             }
 
-            $cat = Category::firstOrCreate(
-                ['name' => $cleanCategoryName],
-                ['slug' => Str::slug($cleanCategoryName)]
-            );
-
-            // Create Product
-            $slug = Str::slug($title);
-            $existingCount = Product::where('slug', 'LIKE', "{$slug}%")->count();
-            if ($existingCount > 0) {
-                $slug = "{$slug}-" . ($existingCount + 1);
-            }
-
-            $rawImage = $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null;
-            $image = (!empty($rawImage) && filter_var($rawImage, FILTER_VALIDATE_URL)) ? $rawImage : null;
-
-            $product = Product::create([
-                'category_id' => $cat->id,
-                'title' => trim($title),
-                'slug' => $slug,
-                'base_price' => $price,
-                'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
-                'image' => $image,
-                'is_new_discovery' => $isNewDiscovery,
-                'is_wedding_special' => $isWeddingSpecial,
-                'is_bestseller' => $isBestseller,
-                'is_hero_featured' => $isHeroFeatured,
-            ]);
-
-            // Save custom attributes from columns (Shapes, Sizes, Type of filling, etc.)
-            foreach ($attributeColumnMap as $colHeader => $attrName) {
-                $colValue = $data[$colHeader] ?? null;
-                if (!empty($colValue)) {
-                    $attribute = $product->attributes()->create(['name' => $attrName]);
-                    // Comma or line separated values
-                    $vals = array_map('trim', preg_split('/[,;\n]+/', $colValue));
-                    foreach ($vals as $val) {
-                        if (!empty($val)) {
-                            $attribute->values()->create([
-                                'value' => $val,
-                                'price_modifier' => 0.00
-                            ]);
+            // ATTR & VARIANT VALUES (Works for both the main row AND merged sub-rows!)
+            if ($currentProduct) {
+                foreach ($attributeColumnMap as $colHeader => $attrName) {
+                    $colValue = $data[$colHeader] ?? null;
+                    if (!empty($colValue)) {
+                        $attribute = $currentProduct->attributes()->firstOrCreate(['name' => $attrName]);
+                        // Comma, slash, or line separated values
+                        $vals = array_map('trim', preg_split('/[,;\n]+/', $colValue));
+                        foreach ($vals as $val) {
+                            if (!empty($val)) {
+                                $attribute->values()->firstOrCreate([
+                                    'value' => $val
+                                ], [
+                                    'price_modifier' => 0.00
+                                ]);
+                            }
                         }
                     }
                 }
             }
-
-            $importedCount++;
         }
 
         return response()->json([
