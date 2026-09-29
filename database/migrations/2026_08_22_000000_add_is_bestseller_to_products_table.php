@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            $table->boolean('is_bestseller')->default(false)->after('is_wedding_special');
-        });
+        if (!Schema::hasColumn('products', 'is_bestseller')) {
+            Schema::table('products', function (Blueprint $table) {
+                $table->boolean('is_bestseller')->default(false)->after('is_wedding_special');
+            });
+        }
     }
 
     /**
