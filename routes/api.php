@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\AuthController;
 
 // ── One-Time Admin Setup (remove after first use) ──
 Route::get('/setup-admin', function () {
+    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     $user = \App\Models\User::firstOrCreate(
         ['email' => 'admin@aartcafe.com'],
         [
@@ -22,7 +23,7 @@ Route::get('/setup-admin', function () {
             'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
         ]
     );
-    return response()->json(['message' => 'Admin user ready', 'email' => $user->email]);
+    return response()->json(['message' => 'Migrations run & Admin user ready', 'email' => $user->email]);
 });
 
 // ── Authentication ──
