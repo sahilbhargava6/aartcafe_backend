@@ -32,6 +32,28 @@ Route::get('/run-migrations', function () {
             'trace' => $e->getTraceAsString()
         ], 500);
     }
+Route::get('/test-auth', function () {
+    try {
+        $user = \App\Models\User::where('email', 'admin@aartcafe.com')->first();
+        if (!$user) {
+            return response()->json(['error' => 'User not found']);
+        }
+        
+        $passwordCheck = \Illuminate\Support\Facades\Hash::check('admin123', $user->password);
+        $token = $user->createToken('admin-token')->plainTextToken;
+        
+        return response()->json([
+            'user_exists' => true,
+            'password_match' => $passwordCheck,
+            'token_generated' => $token
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error_message' => $e->getMessage(),
+            'error_file' => $e->getFile() . ':' . $e->getLine(),
+            'trace' => explode("\n", $e->getTraceAsString())
+        ], 500);
+    }
 });
 
 // Serve uploaded images directly if storage symlink is missing on Laravel Cloud
