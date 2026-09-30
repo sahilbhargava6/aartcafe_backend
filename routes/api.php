@@ -13,6 +13,18 @@ use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\AuthController;
 
+// ── One-Time Admin Setup (remove after first use) ──
+Route::get('/setup-admin', function () {
+    $user = \App\Models\User::firstOrCreate(
+        ['email' => 'admin@aartcafe.com'],
+        [
+            'name' => 'Aartcafe Admin',
+            'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
+        ]
+    );
+    return response()->json(['message' => 'Admin user ready', 'email' => $user->email]);
+});
+
 // ── Authentication ──
 Route::post('/login', [AuthController::class, 'login']);
 
