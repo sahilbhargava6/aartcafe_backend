@@ -30,8 +30,9 @@ Route::get('/setup-admin', function () {
 // ── Authentication ──
 Route::post('/login', [AuthController::class, 'login']);
 
-// ── Public Order Submission (Cart) ──
+// ── Public Order Submission & Tracking ──
 Route::post('/orders', [OrderController::class, 'store']);
+Route::get('/orders/track', [OrderController::class, 'track']);
 
 // ── Public Reviews ──
 Route::get('/reviews', [ReviewController::class, 'index']);

@@ -61,4 +61,30 @@ class OrderController extends Controller
 
         return response()->json(['message' => 'Order deleted successfully']);
     }
+
+    public function track(Request $request)
+    {
+        $query = $request->input('query');
+        if (!$query) {
+            return response()->json(['message' => 'Please provide an Order ID or Phone Number.'], 422);
+        }
+
+        $cleanQuery = trim($query);
+        $numericId = preg_replace('/[^0-9]/', '', $cleanQuery);
+
+        $orders = Order::query()
+            ->when($numericId, function ($q) use ($numericId) {
+                $q->orWhere('id', $numericId);
+            })
+            ->orWhere('customer_phone', 'LIKE', "%{$cleanQuery}%")
+            ->orWhere('customer_email', 'LIKE', "%{$cleanQuery}%")
+            ->orderBy('id', 'desc')
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json(['message' => 'No orders found for this ID or Phone Number.'], 404);
+        }
+
+        return response()->json($orders);
+    }
 }
