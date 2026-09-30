@@ -13,7 +13,34 @@ use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\AuthController;
 
-// ── One-Time Admin Setup (remove after first use) ──
+// ── One-Time Admin Setup & Migrations ──
+Route::get('/run-migrations', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        
+        $user = \App\Models\User::firstOrCreate(
+            ['email' => 'admin@aartcafe.com'],
+            [
+                'name' => 'Aartcafe Admin',
+                'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
+            ]
+        );
+        
+        return response()->json([
+            'status' => 'success',
+            'artisan_output' => $output,
+            'admin_user' => $user->email
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 Route::get('/setup-admin', function () {
     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     $user = \App\Models\User::firstOrCreate(
