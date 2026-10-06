@@ -16,11 +16,8 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    try {
-        return response()->json(\App\Models\Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
-    } catch (\Throwable $e) {
-        return response("TRACE: " . $e->getMessage() . " IN " . $e->getFile() . ":" . $e->getLine() . "\n" . $e->getTraceAsString(), 200, ['Content-Type' => 'text/plain']);
-    }
+    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+    return response()->json(['message' => 'Migrations executed successfully']);
 });
 
 // ── Authentication ──
