@@ -14,15 +14,11 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            return response()->json(Product::with(['category', 'categories', 'attributes', 'attributes.values'])->orderBy('id', 'asc')->get());
+            $products = Product::with(['category', 'categories', 'attributes.values'])->orderBy('id', 'asc')->get();
+            return response()->json($products);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Product index error: ' . $e->getMessage());
-            // Fallback without deep eager loading in case of relation anomaly
-            try {
-                return response()->json(Product::with('category')->orderBy('id', 'asc')->get());
-            } catch (\Throwable $ex) {
-                return response()->json([], 200);
-            }
+            \Illuminate\Support\Facades\Log::error('Product index exception: ' . $e->getMessage());
+            return response()->json(Product::orderBy('id', 'asc')->get());
         }
     }
 
