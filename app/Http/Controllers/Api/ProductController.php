@@ -13,13 +13,9 @@ class ProductController extends Controller
 {
     public function index()
     {
-        try {
-            $products = Product::with(['category', 'categories', 'attributes.values'])->orderBy('id', 'asc')->get();
-            return response()->json($products);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Product index exception: ' . $e->getMessage());
-            return response()->json(Product::orderBy('id', 'asc')->get());
-        }
+        return response()->json(
+            Product::with(['category', 'categories', 'attributes.values'])->orderBy('id', 'asc')->get()
+        );
     }
 
     public function store(Request $request)
