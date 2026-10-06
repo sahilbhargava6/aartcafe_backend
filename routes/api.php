@@ -97,6 +97,7 @@ Route::get('/fix-images', [ProductController::class, 'fixImages']);
 // ── Special Filters & Public Endpoints ──
 Route::get('/products/new-discoveries', [ProductController::class, 'newDiscoveries']);
 Route::get('/products/wedding-specials', [ProductController::class, 'weddingSpecials']);
+Route::get('/products/festive-specials', [ProductController::class, 'festiveSpecials']);
 Route::get('/products/bestsellers', [ProductController::class, 'bestsellers']);
 Route::get('/products/hero-featured', [ProductController::class, 'heroFeatured']);
 Route::get('/products/slug/{slug}', [ProductController::class, 'showBySlug']);

@@ -19,7 +19,9 @@ class Product extends Model
         'is_wedding_special',
         'is_bestseller',
         'is_hero_featured',
-        'is_free_delivery'
+        'is_free_delivery',
+        'is_festive_special',
+        'is_active'
     ];
 
     protected $casts = [
@@ -29,6 +31,8 @@ class Product extends Model
         'is_bestseller' => 'boolean',
         'is_hero_featured' => 'boolean',
         'is_free_delivery' => 'boolean',
+        'is_festive_special' => 'boolean',
+        'is_active' => 'boolean',
         'base_price' => 'decimal:2',
         'discount_price' => 'decimal:2'
     ];

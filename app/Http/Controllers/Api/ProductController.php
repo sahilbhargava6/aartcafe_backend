@@ -80,14 +80,20 @@ class ProductController extends Controller
         return response()->json(['message' => 'Fixed images for product ID ' . $product->id, 'done' => false]);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $products = Product::select([
+            $query = Product::select([
                 'id', 'category_id', 'title', 'slug', 'base_price', 'discount_price',
                 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller',
-                'is_hero_featured', 'is_free_delivery'
-            ])->with(['category', 'categories', 'attributes.values'])->get();
+                'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'
+            ])->with(['category', 'categories', 'attributes.values']);
+            
+            if (!$request->has('all')) {
+                $query->where('is_active', true);
+            }
+            
+            $products = $query->get();
             return response()->json($products);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 500);
@@ -113,6 +119,8 @@ class ProductController extends Controller
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
+            'is_festive_special' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
             'attributes.*.values' => 'nullable|array',
@@ -185,6 +193,8 @@ class ProductController extends Controller
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
+            'is_festive_special' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
             'attributes.*.values' => 'nullable|array',
@@ -240,22 +250,27 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_new_discovery', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function weddingSpecials()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_wedding_special', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function bestsellers()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_bestseller', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function heroFeatured()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+    }
+
+    public function festiveSpecials()
+    {
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function show($id)
