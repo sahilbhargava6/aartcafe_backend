@@ -61,7 +61,7 @@ class BannerController extends Controller
             $validated['image_url'] = $this->saveBase64Image($validated['image_url']);
         }
 
-        $data = collect($validated)->except(['link_url', 'is_active'])->toArray();
+        $data = collect($validated)->except(['link_url'])->toArray();
         $banner = Banner::create($data);
         return response()->json($banner, 201);
     }
@@ -92,7 +92,7 @@ class BannerController extends Controller
             $validated['image_url'] = $this->saveBase64Image($validated['image_url']);
         }
 
-        $data = collect($validated)->except(['link_url', 'is_active'])->toArray();
+        $data = collect($validated)->except(['link_url'])->toArray();
         $banner->update($data);
         return response()->json($banner);
     }

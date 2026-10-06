@@ -12,6 +12,11 @@ class Banner extends Model
         'image_url',
         'button_text',
         'button_url',
-        'position'
+        'position',
+        'is_active'
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 }
