@@ -15,6 +15,6 @@ class ProductAttribute extends Model
 
     public function values()
     {
-        return $this->hasMany(ProductAttributeValue::class);
+        return $this->hasMany(ProductAttributeValue::class, 'product_attribute_id');
     }
 }
