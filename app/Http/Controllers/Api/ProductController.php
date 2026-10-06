@@ -41,34 +41,43 @@ class ProductController extends Controller
 
     public function fixImages()
     {
-        set_time_limit(300);
-        $updatedCount = 0;
-        Product::chunk(5, function ($products) use (&$updatedCount) {
-            foreach ($products as $product) {
-                $changed = false;
-                if ($product->image && str_starts_with($product->image, 'data:image')) {
-                    $product->image = $this->saveBase64Image($product->image);
+        $product = Product::where('image', 'LIKE', 'data:image%')
+            ->orWhere('images', 'LIKE', '%data:image%')
+            ->first();
+
+        if (!$product) {
+            return response()->json(['message' => 'No more products to fix.', 'done' => true]);
+        }
+
+        $changed = false;
+        if ($product->image && str_starts_with($product->image, 'data:image')) {
+            $product->image = $this->saveBase64Image($product->image);
+            $changed = true;
+        }
+        
+        $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
+        if (is_array($imagesData)) {
+            $newImages = [];
+            foreach ($imagesData as $img) {
+                if ($img && str_starts_with($img, 'data:image')) {
+                    $newImages[] = $this->saveBase64Image($img);
                     $changed = true;
-                }
-                if (is_array($product->images)) {
-                    $newImages = [];
-                    foreach ($product->images as $img) {
-                        if ($img && str_starts_with($img, 'data:image')) {
-                            $newImages[] = $this->saveBase64Image($img);
-                            $changed = true;
-                        } else {
-                            $newImages[] = $img;
-                        }
-                    }
-                    $product->images = $newImages;
-                }
-                if ($changed) {
-                    $product->save();
-                    $updatedCount++;
+                } else {
+                    $newImages[] = $img;
                 }
             }
-        });
-        return response()->json(['message' => 'Fixed images for ' . $updatedCount . ' products.']);
+            $product->images = $newImages;
+        }
+
+        if ($changed) {
+            // Unset relation so we don't try to save them
+            $product->unsetRelation('category');
+            $product->unsetRelation('categories');
+            $product->unsetRelation('attributes');
+            $product->save();
+        }
+
+        return response()->json(['message' => 'Fixed images for product ID ' . $product->id, 'done' => false]);
     }
 
     public function index()

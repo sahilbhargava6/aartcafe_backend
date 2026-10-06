@@ -21,6 +21,7 @@ Route::get('/setup-admin', function () {
         \Illuminate\Support\Facades\Artisan::call('config:clear');
         \Illuminate\Support\Facades\Artisan::call('cache:clear');
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        \Illuminate\Support\Facades\Artisan::call('storage:link'); // Added to fix broken images
         $prods = \App\Models\Product::all();
         return response()->json(['status' => 'ok', 'count' => count($prods), 'version' => '2026-10-07-fix-v2']);
     } catch (\Throwable $e) {
