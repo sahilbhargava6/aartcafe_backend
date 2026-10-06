@@ -17,9 +17,12 @@ use App\Http\Controllers\Api\AuthController;
 
 Route::get('/setup-admin', function () {
     try {
+        \Illuminate\Support\Facades\Artisan::call('route:clear');
+        \Illuminate\Support\Facades\Artisan::call('config:clear');
+        \Illuminate\Support\Facades\Artisan::call('cache:clear');
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
         $prods = \App\Models\Product::all();
-        return response()->json(['status' => 'ok', 'count' => count($prods), 'version' => '2026-10-07-fix']);
+        return response()->json(['status' => 'ok', 'count' => count($prods), 'version' => '2026-10-07-fix-v2']);
     } catch (\Throwable $e) {
         return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
     }
