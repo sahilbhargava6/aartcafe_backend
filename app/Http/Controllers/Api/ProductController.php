@@ -13,7 +13,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        return response()->json(Product::all());
+        return response()->json(Product::with(['category', 'categories', 'attributes.values'])->get());
     }
 
     public function store(Request $request)
@@ -77,11 +77,6 @@ class ProductController extends Controller
         }
 
         return response()->json($product->load(['category', 'categories', 'attributes.values']), 201);
-    }
-
-    public function show(Product $product)
-    {
-        return response()->json($product->load(['category', 'categories', 'attributes.values', 'reviews']));
     }
 
     public function update(Request $request, Product $product)
@@ -169,7 +164,7 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        $product = Product::with(['category', 'attributes.values', 'reviews'])->find($id);
+        $product = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->find($id);
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
@@ -178,9 +173,9 @@ class ProductController extends Controller
 
     public function showBySlug($slug)
     {
-        $product = Product::where('slug', $slug)->with(['category', 'attributes.values', 'reviews'])->first();
+        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
         if (!$product) {
-            $all = Product::with(['category', 'attributes.values', 'reviews'])->get();
+            $all = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->get();
             $product = $all->first(function ($p) use ($slug) {
                 return Str::slug($p->title) === $slug || $p->slug === $slug || stripos($p->title, str_replace('-', ' ', $slug)) !== false;
             });
