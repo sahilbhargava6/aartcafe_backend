@@ -16,7 +16,11 @@ class ProductController extends Controller
         try {
             return response()->json(Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
         } catch (\Throwable $e) {
-            return response()->json(Product::orderBy('id', 'asc')->get());
+            try {
+                return response()->json(Product::all());
+            } catch (\Throwable $ex) {
+                return response()->json([]);
+            }
         }
     }
 
