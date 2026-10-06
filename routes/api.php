@@ -16,17 +16,7 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $data = (new \App\Http\Controllers\Api\ProductController())->index();
-        return $data;
-    } catch (\Throwable $e) {
-        return response()->json([
-            'err_message' => $e->getMessage(),
-            'err_file' => $e->getFile(),
-            'err_line' => $e->getLine(),
-        ]);
-    }
+    return response()->json(\App\Models\Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
 });
 
 // ── Authentication ──
