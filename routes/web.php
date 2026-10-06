@@ -7,6 +7,14 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/test-db-products', function () {
+    try {
+        return response()->json(\App\Models\Product::all());
+    } catch (\Throwable $e) {
+        return response("DB ERROR: " . $e->getMessage() . " AT " . $e->getFile() . ":" . $e->getLine(), 200, ['Content-Type' => 'text/plain']);
+    }
+});
+
 
 
 
