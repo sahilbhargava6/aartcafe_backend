@@ -145,7 +145,7 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load(['category', 'categories', 'attributes.values']));
+        return response()->json($product->load(['category', 'attributes.values']));
     }
 
     public function destroy(Product $product)
