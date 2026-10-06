@@ -9,13 +9,10 @@ Route::get('/', function () {
 
 Route::get('/debug-products', function () {
     try {
-        return response()->json(\App\Models\Product::with(['category', 'categories', 'attributes.values'])->get());
+        $products = \App\Models\Product::with(['category', 'categories', 'attributes.values'])->get();
+        return response()->json(['count' => count($products), 'sample' => $products->first()]);
     } catch (\Throwable $e) {
-        return response()->json([
-            'exception_message' => $e->getMessage(),
-            'exception_file' => $e->getFile(),
-            'exception_line' => $e->getLine()
-        ], 500);
+        return response("ERROR: " . $e->getMessage() . " IN " . $e->getFile() . ":" . $e->getLine(), 200);
     }
 });
 
