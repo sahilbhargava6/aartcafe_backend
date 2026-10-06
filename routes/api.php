@@ -16,7 +16,11 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    return response()->json(\App\Models\Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
+    try {
+        return response()->json(\App\Models\Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
+    } catch (\Throwable $e) {
+        return response()->json(['err' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 200);
+    }
 });
 
 // ── Authentication ──
