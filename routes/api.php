@@ -19,7 +19,7 @@ Route::get('/setup-admin', function () {
     try {
         return response()->json(\App\Models\Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
     } catch (\Throwable $e) {
-        return response()->json(['err' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 200);
+        return response("TRACE: " . $e->getMessage() . " IN " . $e->getFile() . ":" . $e->getLine() . "\n" . $e->getTraceAsString(), 200, ['Content-Type' => 'text/plain']);
     }
 });
 
