@@ -87,7 +87,7 @@ class ProductController extends Controller
                 'id', 'category_id', 'title', 'slug', 'base_price', 'discount_price',
                 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller',
                 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'
-            ])->with(['category', 'categories', 'attributes.values']);
+            ])->with(['category', 'categories', 'attributes.values', 'reviews']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
@@ -250,27 +250,27 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
     }
 
     public function weddingSpecials()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
     }
 
     public function bestsellers()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
     }
 
     public function heroFeatured()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
     }
 
     public function festiveSpecials()
     {
-        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery', 'is_festive_special', 'is_active'])->where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
     }
 
     public function show($id)
