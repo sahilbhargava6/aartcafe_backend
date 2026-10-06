@@ -57,6 +57,17 @@ Route::get('/debug', function () {
     }
 });
 
+Route::get('/logs', function () {
+    $logFile = storage_path('logs/laravel.log');
+    if (file_exists($logFile)) {
+        // Get the last 1000 lines or so
+        $lines = file($logFile);
+        $lastLines = array_slice($lines, -200);
+        return response(implode("", $lastLines))->header('Content-Type', 'text/plain');
+    }
+    return 'No log file found.';
+});
+
 // ── Authentication ──
 Route::post('/login', [AuthController::class, 'login']);
 
