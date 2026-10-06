@@ -13,17 +13,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        try {
-            return response()->json(
-                Product::with(['category', 'categories', 'attributes', 'attributes.values'])->orderBy('id', 'asc')->get()
-            );
-        } catch (\Throwable $e) {
-            return response()->json([
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ], 500);
-        }
+        return response()->json(Product::all());
     }
 
     public function store(Request $request)
