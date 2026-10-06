@@ -16,15 +16,20 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    $user = \App\Models\User::firstOrCreate(
-        ['email' => 'admin@aartcafe.com'],
-        [
-            'name' => 'Aartcafe Admin',
-            'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
-        ]
-    );
-    return response()->json(['message' => 'Migrations run & Admin user ready', 'email' => $user->email]);
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $testProducts = \App\Models\Product::with(['category', 'categories', 'attributes', 'attributes.values'])->orderBy('id', 'asc')->get();
+        return response()->json([
+            'status' => 'ok',
+            'product_count' => count($testProducts),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ], 500);
+    }
 });
 
 // ── Authentication ──
