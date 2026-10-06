@@ -9,7 +9,7 @@ Route::get('/', function () {
 
 Route::get('/test-db-products', function () {
     try {
-        return response()->json(\App\Models\Product::all());
+        return response()->json(\App\Models\Product::select('id', 'title')->get());
     } catch (\Throwable $e) {
         return response("DB ERROR: " . $e->getMessage() . " AT " . $e->getFile() . ":" . $e->getLine(), 200, ['Content-Type' => 'text/plain']);
     }

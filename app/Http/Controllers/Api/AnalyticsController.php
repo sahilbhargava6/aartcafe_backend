@@ -26,7 +26,7 @@ class AnalyticsController extends Controller
     public function products()
     {
         // Simple aggregate representation of products viewed or converted
-        $products = Product::with('category')->get()->map(function($product) {
+        $products = Product::with('category')->select('id', 'title', 'category_id')->get()->map(function($product) {
             return [
                 'id' => $product->id,
                 'title' => $product->title,

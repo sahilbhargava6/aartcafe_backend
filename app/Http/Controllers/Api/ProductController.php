@@ -271,10 +271,10 @@ class ProductController extends Controller
     {
         $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
         if (!$product) {
-            $all = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->get();
-            $product = $all->first(function ($p) use ($slug) {
-                return Str::slug($p->title) === $slug || $p->slug === $slug || stripos($p->title, str_replace('-', ' ', $slug)) !== false;
-            });
+            $product = Product::where('slug', $slug)
+                ->orWhere('title', 'LIKE', '%' . str_replace('-', ' ', $slug) . '%')
+                ->with(['category', 'categories', 'attributes.values', 'reviews'])
+                ->first();
         }
 
         if (!$product) {
