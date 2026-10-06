@@ -14,7 +14,12 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            return response()->json(Product::with(['category', 'categories', 'attributes.values'])->get());
+            $products = Product::select([
+                'id', 'category_id', 'title', 'slug', 'base_price', 'discount_price',
+                'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller',
+                'is_hero_featured', 'is_free_delivery'
+            ])->with(['category', 'categories', 'attributes.values'])->get();
+            return response()->json($products);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 500);
         }
