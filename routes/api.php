@@ -18,11 +18,8 @@ use App\Http\Controllers\Api\AuthController;
 Route::get('/setup-admin', function () {
     try {
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $testProducts = \App\Models\Product::with(['category', 'categories', 'attributes', 'attributes.values'])->orderBy('id', 'asc')->get();
-        return response()->json([
-            'status' => 'ok',
-            'product_count' => count($testProducts),
-        ]);
+        $controller = new \App\Http\Controllers\Api\ProductController();
+        return $controller->index();
     } catch (\Throwable $e) {
         return response()->json([
             'error' => $e->getMessage(),
