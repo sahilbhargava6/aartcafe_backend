@@ -30,11 +30,20 @@ Route::get('/setup-admin', function () {
 
 Route::get('/debug', function () {
     try {
+        // Clear OPcache to force reloading PHP files
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+        
+        // Try to instantiate the controller to check for class loading errors
+        $controllerClass = \App\Http\Controllers\Api\ProductController::class;
+        
         $products = \App\Models\Product::with(['category', 'categories', 'attributes.values'])->get();
         return response()->json([
             'status' => 'ok',
-            'version' => '2026-10-07-fix',
+            'version' => '2026-10-07-fix-v3',
             'product_count' => $products->count(),
+            'controller_class' => $controllerClass,
             'first_product' => $products->first(),
         ]);
     } catch (\Throwable $e) {
