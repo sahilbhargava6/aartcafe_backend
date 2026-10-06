@@ -16,8 +16,13 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    return response()->json(['message' => 'Migrations executed successfully']);
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $prods = \App\Models\Product::all();
+        return response()->json(['status' => 'ok', 'count' => count($prods)]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+    }
 });
 
 // ── Authentication ──
