@@ -8,6 +8,33 @@ use Illuminate\Http\Request;
 
 class BannerController extends Controller
 {
+    private function saveBase64Image($base64String, $pathPrefix = 'banners/')
+    {
+        if (empty($base64String)) return $base64String;
+
+        if (preg_match('/^data:image\/([^;]+);base64,/', $base64String, $matches)) {
+            $imageData = substr($base64String, strpos($base64String, ',') + 1);
+            $type = strtolower($matches[1]);
+            if ($type === 'svg+xml') $type = 'svg';
+
+            $imageData = base64_decode($imageData);
+            if ($imageData === false) {
+                return $base64String;
+            }
+
+            $filename = $pathPrefix . uniqid() . '_' . time() . '.' . $type;
+            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $imageData);
+            
+            $url = \Illuminate\Support\Facades\Storage::disk('public')->url($filename);
+            if (!preg_match('/^http/', $url)) {
+                $url = rtrim(config('app.url'), '/') . $url;
+            }
+            return $url;
+        }
+
+        return $base64String;
+    }
+
     public function index()
     {
         return response()->json(Banner::all());
@@ -21,10 +48,21 @@ class BannerController extends Controller
             'image_url' => 'required|string',
             'button_text' => 'nullable|string',
             'button_url' => 'nullable|string',
-            'position' => 'nullable|string'
+            'link_url' => 'nullable|string', // Support frontend sending link_url
+            'position' => 'nullable|string',
+            'is_active' => 'nullable|boolean'
         ]);
 
-        $banner = Banner::create($validated);
+        if (isset($validated['link_url']) && !isset($validated['button_url'])) {
+            $validated['button_url'] = $validated['link_url'];
+        }
+
+        if (!empty($validated['image_url'])) {
+            $validated['image_url'] = $this->saveBase64Image($validated['image_url']);
+        }
+
+        $data = collect($validated)->except(['link_url', 'is_active'])->toArray();
+        $banner = Banner::create($data);
         return response()->json($banner, 201);
     }
 
@@ -41,10 +79,21 @@ class BannerController extends Controller
             'image_url' => 'sometimes|required|string',
             'button_text' => 'nullable|string',
             'button_url' => 'nullable|string',
-            'position' => 'sometimes|required|string'
+            'link_url' => 'nullable|string', // Support frontend sending link_url
+            'position' => 'nullable|string',
+            'is_active' => 'nullable|boolean'
         ]);
 
-        $banner->update($validated);
+        if (isset($validated['link_url']) && !isset($validated['button_url'])) {
+            $validated['button_url'] = $validated['link_url'];
+        }
+
+        if (!empty($validated['image_url'])) {
+            $validated['image_url'] = $this->saveBase64Image($validated['image_url']);
+        }
+
+        $data = collect($validated)->except(['link_url', 'is_active'])->toArray();
+        $banner->update($data);
         return response()->json($banner);
     }
 
