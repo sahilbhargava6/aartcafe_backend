@@ -8,9 +8,69 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
+    private function saveBase64Image($base64String, $pathPrefix = 'products/')
+    {
+        if (empty($base64String)) return $base64String;
+
+        if (preg_match('/^data:image\/([^;]+);base64,/', $base64String, $matches)) {
+            $imageData = substr($base64String, strpos($base64String, ',') + 1);
+            $type = strtolower($matches[1]);
+            if ($type === 'svg+xml') $type = 'svg';
+
+            $imageData = base64_decode($imageData);
+            if ($imageData === false) {
+                return $base64String;
+            }
+
+            $filename = $pathPrefix . uniqid() . '_' . time() . '.' . $type;
+            Storage::disk('public')->put($filename, $imageData);
+            
+            $url = Storage::disk('public')->url($filename);
+            if (!preg_match('/^http/', $url)) {
+                $url = rtrim(config('app.url'), '/') . $url;
+            }
+            return $url;
+        }
+
+        return $base64String;
+    }
+
+    public function fixImages()
+    {
+        set_time_limit(300);
+        $updatedCount = 0;
+        Product::chunk(5, function ($products) use (&$updatedCount) {
+            foreach ($products as $product) {
+                $changed = false;
+                if ($product->image && str_starts_with($product->image, 'data:image')) {
+                    $product->image = $this->saveBase64Image($product->image);
+                    $changed = true;
+                }
+                if (is_array($product->images)) {
+                    $newImages = [];
+                    foreach ($product->images as $img) {
+                        if ($img && str_starts_with($img, 'data:image')) {
+                            $newImages[] = $this->saveBase64Image($img);
+                            $changed = true;
+                        } else {
+                            $newImages[] = $img;
+                        }
+                    }
+                    $product->images = $newImages;
+                }
+                if ($changed) {
+                    $product->save();
+                    $updatedCount++;
+                }
+            }
+        });
+        return response()->json(['message' => 'Fixed images for ' . $updatedCount . ' products.']);
+    }
+
     public function index()
     {
         try {
@@ -62,6 +122,15 @@ class ProductController extends Controller
 
         if (!empty($categoryIds)) {
             $validated['category_id'] = $categoryIds[0];
+        }
+
+        if (!empty($validated['image'])) {
+            $validated['image'] = $this->saveBase64Image($validated['image']);
+        }
+        if (!empty($validated['images']) && is_array($validated['images'])) {
+            $validated['images'] = array_map(function($img) {
+                return $this->saveBase64Image($img);
+            }, $validated['images']);
         }
 
         $productData = collect($validated)->except(['attributes', 'category_ids'])->toArray();
@@ -122,6 +191,15 @@ class ProductController extends Controller
             $product->categories()->sync($categoryIds);
         }
 
+        if (!empty($validated['image'])) {
+            $validated['image'] = $this->saveBase64Image($validated['image']);
+        }
+        if (!empty($validated['images']) && is_array($validated['images'])) {
+            $validated['images'] = array_map(function($img) {
+                return $this->saveBase64Image($img);
+            }, $validated['images']);
+        }
+
         $productData = collect($validated)->except(['attributes', 'category_ids'])->toArray();
         $product->update($productData);
 
@@ -153,22 +231,22 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        return response()->json(Product::where('is_new_discovery', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_new_discovery', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function weddingSpecials()
     {
-        return response()->json(Product::where('is_wedding_special', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_wedding_special', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function bestsellers()
     {
-        return response()->json(Product::where('is_bestseller', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_bestseller', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function heroFeatured()
     {
-        return response()->json(Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
+        return response()->json(Product::select(['id', 'category_id', 'title', 'slug', 'base_price', 'discount_price', 'image', 'is_new_discovery', 'is_wedding_special', 'is_bestseller', 'is_hero_featured', 'is_free_delivery'])->where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
     }
 
     public function show($id)
@@ -352,7 +430,11 @@ class ProductController extends Controller
                 }
 
                 $rawImage = $data['product image'] ?? $data['Product Image'] ?? $data['image'] ?? $data['Image'] ?? null;
-                $image = (!empty($rawImage) && filter_var($rawImage, FILTER_VALIDATE_URL)) ? $rawImage : null;
+                if (!empty($rawImage) && str_starts_with($rawImage, 'data:image')) {
+                    $image = $this->saveBase64Image($rawImage);
+                } else {
+                    $image = (!empty($rawImage) && filter_var($rawImage, FILTER_VALIDATE_URL)) ? $rawImage : null;
+                }
 
                 $currentProduct = Product::create([
                     'category_id' => $currentCat->id,

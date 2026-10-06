@@ -100,6 +100,9 @@ Route::post('/reviews', [ReviewController::class, 'store']);
 Route::get('/analytics/website', [AnalyticsController::class, 'website']);
 Route::get('/analytics/products', [AnalyticsController::class, 'products']);
 
+// Fix Images 
+Route::get('/fix-images', [ProductController::class, 'fixImages']);
+
 // ── Special Filters & Public Endpoints ──
 Route::get('/products/new-discoveries', [ProductController::class, 'newDiscoveries']);
 Route::get('/products/wedding-specials', [ProductController::class, 'weddingSpecials']);
