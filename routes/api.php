@@ -41,18 +41,19 @@ Route::get('/debug', function () {
         
         $productsCount = \App\Models\Product::count();
         
-        $maxImageLen = \Illuminate\Support\Facades\DB::table('products')
-            ->selectRaw('MAX(LENGTH(image)) as max_len')->value('max_len');
-            
-        $maxImagesLen = \Illuminate\Support\Facades\DB::table('products')
-            ->selectRaw('MAX(LENGTH(images)) as max_len')->value('max_len');
+        $files = [];
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists('banners')) {
+            $files = \Illuminate\Support\Facades\Storage::disk('public')->files('banners');
+        }
 
         return response()->json([
             'status' => 'ok',
-            'version' => '2026-10-07-fix-v5',
+            'version' => '2026-10-07-fix-v6',
             'product_count' => $productsCount,
-            'max_image_len' => $maxImageLen,
-            'max_images_len' => $maxImagesLen,
+            'banners_files' => $files,
+            'storage_path' => storage_path('app/public'),
+            'public_storage_exists' => file_exists(public_path('storage')),
+            'public_storage_is_link' => is_link(public_path('storage'))
         ]);
     } catch (\Throwable $e) {
         return response()->json([
