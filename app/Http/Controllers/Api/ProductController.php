@@ -13,7 +13,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        return response()->json(Product::with(['category', 'categories', 'attributes.values'])->orderBy('id', 'asc')->get());
+        return response()->json(Product::with(['category', 'categories', 'attributes', 'attributes.values'])->orderBy('id', 'asc')->get());
     }
 
     public function store(Request $request)
