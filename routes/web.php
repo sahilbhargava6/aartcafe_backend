@@ -8,7 +8,15 @@ Route::get('/', function () {
 });
 
 Route::get('/debug-products', function () {
-    return response()->json(\App\Models\Product::all());
+    try {
+        return response()->json(\App\Models\Product::with(['category', 'categories', 'attributes.values'])->get());
+    } catch (\Throwable $e) {
+        return response()->json([
+            'exception_message' => $e->getMessage(),
+            'exception_file' => $e->getFile(),
+            'exception_line' => $e->getLine()
+        ], 500);
+    }
 });
 
 
