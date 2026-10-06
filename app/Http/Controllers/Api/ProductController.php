@@ -177,6 +177,11 @@ class ProductController extends Controller
         return response()->json(Product::where('is_hero_featured', true)->with(['category', 'attributes.values'])->get());
     }
 
+    public function show(Product $product)
+    {
+        return response()->json($product->load(['category', 'categories', 'attributes', 'attributes.values', 'reviews']));
+    }
+
     public function showBySlug($slug)
     {
         $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
