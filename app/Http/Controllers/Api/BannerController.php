@@ -23,9 +23,10 @@ class BannerController extends Controller
             }
 
             $filename = $pathPrefix . uniqid() . '_' . time() . '.' . $type;
-            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $imageData);
+            $disk = config('filesystems.default', 'public');
+            \Illuminate\Support\Facades\Storage::disk($disk)->put($filename, $imageData);
             
-            $url = \Illuminate\Support\Facades\Storage::disk('public')->url($filename);
+            $url = \Illuminate\Support\Facades\Storage::disk($disk)->url($filename);
             if (!preg_match('/^http/', $url)) {
                 $url = rtrim(config('app.url'), '/') . $url;
             }
