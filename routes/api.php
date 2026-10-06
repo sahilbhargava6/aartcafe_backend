@@ -16,12 +16,17 @@ use App\Http\Controllers\Api\AuthController;
 
 
 Route::get('/setup-admin', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    return response()->json(['message' => 'Migrations executed successfully']);
-});
-
-Route::get('/test-products', function () {
-    return (new \App\Http\Controllers\Api\ProductController())->index();
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $data = (new \App\Http\Controllers\Api\ProductController())->index();
+        return $data;
+    } catch (\Throwable $e) {
+        return response()->json([
+            'err_message' => $e->getMessage(),
+            'err_file' => $e->getFile(),
+            'err_line' => $e->getLine(),
+        ]);
+    }
 });
 
 // ── Authentication ──
