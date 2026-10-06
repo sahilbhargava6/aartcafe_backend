@@ -27,10 +27,9 @@ class ProductController extends Controller
             }
 
             $filename = $pathPrefix . uniqid() . '_' . time() . '.' . $type;
-            $disk = config('filesystems.default', 'public');
-            Storage::disk($disk)->put($filename, $imageData);
+            Storage::disk('public')->put($filename, $imageData);
             
-            $url = Storage::disk($disk)->url($filename);
+            $url = Storage::disk('public')->url($filename);
             if (!preg_match('/^http/', $url)) {
                 $url = rtrim(config('app.url'), '/') . $url;
             }
