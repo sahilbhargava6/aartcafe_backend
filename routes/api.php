@@ -38,13 +38,30 @@ Route::get('/debug', function () {
         // Try to instantiate the controller to check for class loading errors
         $controllerClass = \App\Http\Controllers\Api\ProductController::class;
         
-        $products = \App\Models\Product::with(['category', 'categories', 'attributes.values'])->get();
+        $products = \App\Models\Product::all();
+        $maxLengthImage = 0;
+        $maxLengthImages = 0;
+        $maxProduct = null;
+        
+        foreach ($products as $p) {
+            $imgLen = strlen((string)$p->image);
+            $imgsLen = strlen((string)$p->images);
+            if ($imgLen > $maxLengthImage) {
+                $maxLengthImage = $imgLen;
+                $maxProduct = $p->id;
+            }
+            if ($imgsLen > $maxLengthImages) {
+                $maxLengthImages = $imgsLen;
+            }
+        }
+
         return response()->json([
             'status' => 'ok',
-            'version' => '2026-10-07-fix-v3',
+            'version' => '2026-10-07-fix-v4',
             'product_count' => $products->count(),
-            'controller_class' => $controllerClass,
-            'first_product' => $products->first(),
+            'max_image_len' => $maxLengthImage,
+            'max_images_len' => $maxLengthImages,
+            'max_product_id' => $maxProduct,
         ]);
     } catch (\Throwable $e) {
         return response()->json([
