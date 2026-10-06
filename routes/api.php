@@ -20,6 +20,10 @@ Route::get('/setup-admin', function () {
     return response()->json(['message' => 'Migrations executed successfully']);
 });
 
+Route::get('/test-products', function () {
+    return (new \App\Http\Controllers\Api\ProductController())->index();
+});
+
 // ── Authentication ──
 Route::post('/login', [AuthController::class, 'login']);
 
