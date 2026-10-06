@@ -13,7 +13,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        return response()->json(Product::with(['category', 'categories', 'attributes.values'])->orderBy('id', 'asc')->get());
+        return response()->json(Product::with(['category', 'attributes.values'])->orderBy('id', 'asc')->get());
     }
 
     public function store(Request $request)
@@ -169,14 +169,14 @@ class ProductController extends Controller
 
     public function show(Product $product)
     {
-        return response()->json($product->load(['category', 'categories', 'attributes', 'attributes.values', 'reviews']));
+        return response()->json($product->load(['category', 'attributes.values', 'reviews']));
     }
 
     public function showBySlug($slug)
     {
-        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
+        $product = Product::where('slug', $slug)->with(['category', 'attributes.values', 'reviews'])->first();
         if (!$product) {
-            $all = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->get();
+            $all = Product::with(['category', 'attributes.values', 'reviews'])->get();
             $product = $all->first(function ($p) use ($slug) {
                 return Str::slug($p->title) === $slug || $p->slug === $slug || stripos($p->title, str_replace('-', ' ', $slug)) !== false;
             });
