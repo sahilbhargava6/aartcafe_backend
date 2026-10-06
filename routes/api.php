@@ -19,9 +19,29 @@ Route::get('/setup-admin', function () {
     try {
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
         $prods = \App\Models\Product::all();
-        return response()->json(['status' => 'ok', 'count' => count($prods)]);
+        return response()->json(['status' => 'ok', 'count' => count($prods), 'version' => '2026-10-07-fix']);
     } catch (\Throwable $e) {
         return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+    }
+});
+
+Route::get('/debug', function () {
+    try {
+        $products = \App\Models\Product::with(['category', 'categories', 'attributes.values'])->get();
+        return response()->json([
+            'status' => 'ok',
+            'version' => '2026-10-07-fix',
+            'product_count' => $products->count(),
+            'first_product' => $products->first(),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
     }
 });
 
