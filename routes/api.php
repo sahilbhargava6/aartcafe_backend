@@ -38,30 +38,20 @@ Route::get('/debug', function () {
         // Try to instantiate the controller to check for class loading errors
         $controllerClass = \App\Http\Controllers\Api\ProductController::class;
         
-        $products = \App\Models\Product::all();
-        $maxLengthImage = 0;
-        $maxLengthImages = 0;
-        $maxProduct = null;
+        $productsCount = \App\Models\Product::count();
         
-        foreach ($products as $p) {
-            $imgLen = strlen((string)$p->image);
-            $imgsLen = strlen((string)$p->images);
-            if ($imgLen > $maxLengthImage) {
-                $maxLengthImage = $imgLen;
-                $maxProduct = $p->id;
-            }
-            if ($imgsLen > $maxLengthImages) {
-                $maxLengthImages = $imgsLen;
-            }
-        }
+        $maxImageLen = \Illuminate\Support\Facades\DB::table('products')
+            ->selectRaw('MAX(LENGTH(image)) as max_len')->value('max_len');
+            
+        $maxImagesLen = \Illuminate\Support\Facades\DB::table('products')
+            ->selectRaw('MAX(LENGTH(images)) as max_len')->value('max_len');
 
         return response()->json([
             'status' => 'ok',
-            'version' => '2026-10-07-fix-v4',
-            'product_count' => $products->count(),
-            'max_image_len' => $maxLengthImage,
-            'max_images_len' => $maxLengthImages,
-            'max_product_id' => $maxProduct,
+            'version' => '2026-10-07-fix-v5',
+            'product_count' => $productsCount,
+            'max_image_len' => $maxImageLen,
+            'max_images_len' => $maxImagesLen,
         ]);
     } catch (\Throwable $e) {
         return response()->json([
