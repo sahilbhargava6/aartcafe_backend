@@ -7,14 +7,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/debug-products', function () {
-    try {
-        $products = \App\Models\Product::with(['category', 'categories', 'attributes.values'])->get();
-        return response()->json(['count' => count($products), 'sample' => $products->first()]);
-    } catch (\Throwable $e) {
-        return response("ERROR: " . $e->getMessage() . " IN " . $e->getFile() . ":" . $e->getLine(), 200);
-    }
-});
+
 
 
 
