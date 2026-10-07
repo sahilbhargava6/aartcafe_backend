@@ -111,8 +111,15 @@ Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/pages', [PageController::class, 'index']);
 
-// ── File Uploads ──
+// ── File Uploads & Storage Proxy ──
 Route::post('/upload', [UploadController::class, 'store']);
+Route::get('/images/{path}', function($path) {
+    $disk = config('filesystems.default', 'public');
+    if (!\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+        abort(404);
+    }
+    return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
+})->where('path', '.*');
 
 // ── Protected Dashboard Routes (Sanctum) ──
 Route::middleware('auth:sanctum')->group(function () {
