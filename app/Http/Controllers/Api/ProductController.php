@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    private function saveBase64Image($base64String, $pathPrefix = 'products/')
+    public function saveBase64Image($base64String, $pathPrefix = 'products/')
     {
         if (empty($base64String)) {
             return null;

@@ -24,24 +24,6 @@ $products = json_decode($json, true) ?? [];
 echo "Found " . count($folders) . " folders in local Drive download.\n";
 echo "Found " . count($products) . " products from Production API.\n\n";
 
-// Authenticate to obtain Sanctum admin token
-$loginPayload = json_encode(['email' => 'admin@aartcafe.com', 'password' => 'password123']);
-$ch = curl_init($baseUrl . '/api/login');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $loginPayload);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Accept: application/json']);
-$loginRes = curl_exec($ch);
-curl_close($ch);
-$tokenData = json_decode($loginRes, true);
-$token = $tokenData['token'] ?? null;
-
-if (!$token) {
-    die("Failed to obtain admin authentication token. Check admin credentials.\n");
-}
-
-echo "Authenticated successfully as Admin.\n";
-
 $matchedCount = 0;
 
 foreach ($folders as $folderName) {
@@ -91,29 +73,26 @@ foreach ($folders as $folderName) {
         }
 
         if ($firstImage) {
-            // Update product via API
+            // Update product via dedicated sync-local-images API
             $updateData = [
-                'title' => $matchedProduct['title'],
-                'base_price' => $matchedProduct['base_price'] ?? 0,
                 'image' => $firstImage,
                 'images' => $savedImages
             ];
 
-            $ch = curl_init($baseUrl . '/api/products/' . $matchedProduct['id']);
+            $ch = curl_init($baseUrl . '/api/sync-local-images/' . $matchedProduct['id']);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+            curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($updateData));
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: application/json',
-                'Accept: application/json',
-                'Authorization: Bearer ' . $token
+                'Accept: application/json'
             ]);
             $res = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             
             if ($httpCode >= 200 && $httpCode < 300) {
-                echo "SUCCESS: Updated ID {$matchedProduct['id']} ('{$matchedProduct['title']}')\n";
+                echo "SUCCESS: Uploaded images for ID {$matchedProduct['id']} ('{$matchedProduct['title']}')\n";
                 $matchedCount++;
             } else {
                 echo "FAILED to update ID {$matchedProduct['id']}: HTTP {$httpCode} - {$res}\n";
