@@ -741,15 +741,16 @@ class ProductController extends Controller
             $matchedCount = 0;
             $products = Product::all();
 
-            // Extract all [FileID, Title] pairs embedded in Google Drive page data
+            // Extract drive folder titles using broader regex patterns
             preg_match_all('/\["([a-zA-Z0-9_-]{25,})",\[?"([^"]+?)"/iu', $html, $matches1, PREG_SET_ORDER);
             preg_match_all('/"([a-zA-Z0-9_-]{25,})",\["([^"]+?)"/iu', $html, $matches2, PREG_SET_ORDER);
+            preg_match_all('/\["([a-zA-Z0-9_-]{25,})","([^"]+?)"/iu', $html, $matches3, PREG_SET_ORDER);
 
             $driveFiles = [];
-            foreach (array_merge($matches1, $matches2) as $m) {
+            foreach (array_merge($matches1, $matches2, $matches3) as $m) {
                 $fId = $m[1];
                 $fName = trim($m[2]);
-                if (strlen($fName) > 1 && !str_starts_with($fName, 'http')) {
+                if (strlen($fName) > 1 && !str_starts_with($fName, 'http') && !str_starts_with($fName, 'application/')) {
                     $driveFiles[$fName] = $fId;
                 }
             }
