@@ -133,42 +133,42 @@ class ProductController extends Controller
     public function fixBrokenR2Urls()
     {
         try {
-            $products = Product::where('image', 'LIKE', '%cloudflarestorage.com%')
-                ->orWhere('images', 'LIKE', '%cloudflarestorage.com%')
-                ->get();
-
+            $products = Product::all();
             $fixedCount = 0;
             $baseUrl = rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/');
+
+            // Also ensure storage link exists
+            try {
+                \Illuminate\Support\Facades\Artisan::call('storage:link');
+            } catch (\Throwable $e) {}
 
             foreach ($products as $product) {
                 $changed = false;
 
-                if ($product->image && str_contains($product->image, 'cloudflarestorage.com')) {
-                    $path = parse_url($product->image, PHP_URL_PATH);
-                    if ($path) {
-                        $cleanPath = ltrim($path, '/');
-                        if (str_contains($cleanPath, '/')) {
-                            $parts = explode('/', $cleanPath, 2);
-                            $cleanPath = $parts[1] ?? $cleanPath;
+                // Fix single main image
+                if (!empty($product->image)) {
+                    $img = $product->image;
+                    if (str_contains($img, 'cloudflarestorage.com') || str_contains($img, '/storage/')) {
+                        $filename = basename($img);
+                        if (!empty($filename) && !str_starts_with($img, 'data:image')) {
+                            $newUrl = $baseUrl . '/storage/products/' . $filename;
+                            if ($product->image !== $newUrl) {
+                                $product->image = $newUrl;
+                                $changed = true;
+                            }
                         }
-                        $product->image = $baseUrl . '/storage/' . ltrim($cleanPath, '/');
-                        $changed = true;
                     }
                 }
 
+                // Fix gallery sub-images array
                 $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
                 if (is_array($imagesData)) {
                     $newImages = [];
                     foreach ($imagesData as $img) {
-                        if ($img && str_contains($img, 'cloudflarestorage.com')) {
-                            $path = parse_url($img, PHP_URL_PATH);
-                            if ($path) {
-                                $cleanPath = ltrim($path, '/');
-                                if (str_contains($cleanPath, '/')) {
-                                    $parts = explode('/', $cleanPath, 2);
-                                    $cleanPath = $parts[1] ?? $cleanPath;
-                                }
-                                $newImages[] = $baseUrl . '/storage/' . ltrim($cleanPath, '/');
+                        if (!empty($img) && (str_contains($img, 'cloudflarestorage.com') || str_contains($img, '/storage/'))) {
+                            $filename = basename($img);
+                            if (!empty($filename) && !str_starts_with($img, 'data:image')) {
+                                $newImages[] = $baseUrl . '/storage/products/' . $filename;
                                 $changed = true;
                             } else {
                                 $newImages[] = $img;
@@ -177,7 +177,9 @@ class ProductController extends Controller
                             $newImages[] = $img;
                         }
                     }
-                    $product->images = $newImages;
+                    if ($changed) {
+                        $product->images = $newImages;
+                    }
                 }
 
                 if ($changed) {
@@ -191,7 +193,7 @@ class ProductController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => "Successfully converted broken R2 endpoint URLs to public storage URLs for {$fixedCount} products.",
+                'message' => "Successfully repaired product image paths with /storage/products/ prefix for {$fixedCount} products.",
                 'fixed_count' => $fixedCount,
             ]);
         } catch (\Throwable $e) {
