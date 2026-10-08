@@ -31,7 +31,7 @@ Route::get('/setup-admin', function () {
 
 Route::get('/convert-images-to-webp', [ProductController::class, 'convertAllImagesToWebp']);
 Route::get('/fix-broken-urls', [ProductController::class, 'fixBrokenR2Urls']);
-Route::post('/sync-gdrive-folder', [ProductController::class, 'syncGoogleDriveFolder']);
+Route::match(['get', 'post'], '/sync-gdrive-folder', [ProductController::class, 'syncGoogleDriveFolder']);
 
 Route::get('/debug', function () {
     try {
