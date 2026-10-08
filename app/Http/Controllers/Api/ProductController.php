@@ -811,7 +811,10 @@ class ProductController extends Controller
                 'status' => 'success',
                 'folder_id' => $folderId,
                 'message' => "Successfully processed Google Drive folder for {$matchedCount} products!",
-                'matched_count' => $matchedCount
+                'matched_count' => $matchedCount,
+                'found_drive_folders_count' => count($driveFiles),
+                'found_drive_folders_sample' => array_slice(array_keys($driveFiles), 0, 15),
+                'sample_product_titles' => $products->pluck('title')->take(10)->toArray()
             ]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage(), 'line' => $e->getLine()], 500);
