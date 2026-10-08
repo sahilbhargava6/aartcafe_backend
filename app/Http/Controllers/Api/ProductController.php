@@ -14,8 +14,31 @@ class ProductController extends Controller
 {
     private function saveBase64Image($base64String, $pathPrefix = 'products/')
     {
-        // To avoid ephemeral storage issues on Laravel Cloud without S3,
-        // we just save the Base64 string directly to the database.
+        if (empty($base64String)) {
+            return null;
+        }
+
+        // If it's a base64 encoded image, save as file to public disk / S3
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $type)) {
+            $data = substr($base64String, strpos($base64String, ',') + 1);
+            $type = strtolower($type[1]);
+
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
+                $type = 'jpeg';
+            }
+
+            $decodedData = base64_decode($data);
+            if ($decodedData === false) {
+                return $base64String;
+            }
+
+            $fileName = $pathPrefix . Str::random(24) . '.' . $type;
+            $disk = env('FILESYSTEM_DISK', 'public');
+
+            Storage::disk($disk)->put($fileName, $decodedData);
+            return Storage::disk($disk)->url($fileName);
+        }
+
         return $base64String;
     }
 
@@ -63,7 +86,26 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Product::with(['category', 'categories', 'attributes.values', 'reviews']);
+            // Optimized column selection & lightweight eager loading to prevent OOM
+            $query = Product::select([
+                'id',
+                'category_id',
+                'title',
+                'slug',
+                'base_price',
+                'discount_price',
+                'description',
+                'image',
+                'images',
+                'is_new_discovery',
+                'is_wedding_special',
+                'is_bestseller',
+                'is_hero_featured',
+                'is_free_delivery',
+                'is_festive_special',
+                'is_active',
+                'created_at',
+            ])->with(['category:id,name', 'categories:id,name']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
