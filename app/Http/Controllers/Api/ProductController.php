@@ -724,8 +724,15 @@ class ProductController extends Controller
                 return response()->json(['error' => 'Could not extract Google Drive folder ID from the link.'], 400);
             }
 
-            // Fetch public folder webpage
-            $html = @file_get_contents("https://drive.google.com/drive/folders/{$folderId}");
+            // Fetch public folder webpage with User-Agent header
+            $opts = [
+                "http" => [
+                    "method" => "GET",
+                    "header" => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n"
+                ]
+            ];
+            $context = stream_context_create($opts);
+            $html = @file_get_contents("https://drive.google.com/drive/folders/{$folderId}", false, $context);
             if (!$html) {
                 return response()->json(['error' => 'Unable to read the Google Drive folder. Please ensure the link sharing is set to "Anyone with the link".'], 400);
             }
@@ -734,12 +741,13 @@ class ProductController extends Controller
             $products = Product::all();
 
             foreach ($products as $product) {
-                // Look for product title in the Google Drive folder HTML payload
+                // Look for product title or file ID patterns in the Google Drive folder HTML payload
                 $normalizedTitle = preg_quote($product->title, '/');
-                if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches)) {
+                if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches) ||
+                    preg_match('/\["([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/i', $html, $subMatches)) {
                     $fileId = $subMatches[1];
                     $directUrl = "https://lh3.googleusercontent.com/d/{$fileId}=s1600";
-                    $imageData = @file_get_contents($directUrl);
+                    $imageData = @file_get_contents($directUrl, false, $context);
                     if ($imageData && strlen($imageData) > 0) {
                         $img = @imagecreatefromstring($imageData);
                         $finalData = $imageData;
@@ -766,11 +774,12 @@ class ProductController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => "Successfully matched and assigned photos for {$matchedCount} products from Google Drive!",
+                'folder_id' => $folderId,
+                'message' => "Successfully processed Google Drive folder for {$matchedCount} products!",
                 'matched_count' => $matchedCount
             ]);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage(), 'line' => $e->getLine()], 500);
         }
     }
 }
