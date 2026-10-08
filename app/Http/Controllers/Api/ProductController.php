@@ -703,4 +703,74 @@ class ProductController extends Controller
             'imported_count' => $importedCount
         ], 200);
     }
+
+    public function syncGoogleDriveFolder(Request $request)
+    {
+        try {
+            $folderUrl = $request->input('folder_url');
+            if (empty($folderUrl)) {
+                return response()->json(['error' => 'Please provide a valid Google Drive folder URL.'], 400);
+            }
+
+            // Extract main folder ID
+            $folderId = null;
+            if (preg_match('/\/folders\/([a-zA-Z0-9_-]+)/', $folderUrl, $matches)) {
+                $folderId = $matches[1];
+            } elseif (preg_match('/id=([a-zA-Z0-9_-]+)/', $folderUrl, $matches)) {
+                $folderId = $matches[1];
+            }
+
+            if (!$folderId) {
+                return response()->json(['error' => 'Could not extract Google Drive folder ID from the link.'], 400);
+            }
+
+            // Fetch public folder webpage
+            $html = @file_get_contents("https://drive.google.com/drive/folders/{$folderId}");
+            if (!$html) {
+                return response()->json(['error' => 'Unable to read the Google Drive folder. Please ensure the link sharing is set to "Anyone with the link".'], 400);
+            }
+
+            $matchedCount = 0;
+            $products = Product::all();
+
+            foreach ($products as $product) {
+                // Look for product title in the Google Drive folder HTML payload
+                $normalizedTitle = preg_quote($product->title, '/');
+                if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches)) {
+                    $fileId = $subMatches[1];
+                    $directUrl = "https://lh3.googleusercontent.com/d/{$fileId}=s1600";
+                    $imageData = @file_get_contents($directUrl);
+                    if ($imageData && strlen($imageData) > 0) {
+                        $img = @imagecreatefromstring($imageData);
+                        $finalData = $imageData;
+                        if ($img !== false) {
+                            ob_start();
+                            imagewebp($img, null, 85);
+                            $compressed = ob_get_clean();
+                            if ($compressed) $finalData = $compressed;
+                            imagedestroy($img);
+                        }
+                        $fileName = 'products/' . Str::random(24) . '.webp';
+                        Storage::disk('public')->put($fileName, $finalData);
+                        $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
+                        
+                        $product->image = rtrim($baseUrl, '/') . '/storage/' . $fileName;
+                        $product->unsetRelation('category');
+                        $product->unsetRelation('categories');
+                        $product->unsetRelation('attributes');
+                        $product->save();
+                        $matchedCount++;
+                    }
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Successfully matched and assigned photos for {$matchedCount} products from Google Drive!",
+                'matched_count' => $matchedCount
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }
