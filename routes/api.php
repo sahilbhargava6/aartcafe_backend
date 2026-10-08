@@ -131,6 +131,8 @@ Route::get('/products/bestsellers', [ProductController::class, 'bestsellers']);
 Route::get('/products/hero-featured', [ProductController::class, 'heroFeatured']);
 Route::get('/products/slug/{slug}', [ProductController::class, 'showBySlug']);
 
+Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
+
 // Public Read Resources
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}', [CategoryController::class, 'show']);

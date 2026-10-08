@@ -256,7 +256,7 @@ class ProductController extends Controller
                 'is_festive_special',
                 'is_active',
                 'created_at',
-            ])->with(['category:id,name', 'categories:id,name']);
+            ])->with(['category:id,name', 'categories:id,name', 'attributes.values']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
@@ -537,10 +537,10 @@ class ProductController extends Controller
         }
 
         $importedCount = 0;
-        $defaultCategory = Category::firstOrCreate(
-            ['name' => 'General'],
-            ['slug' => 'general']
-        );
+        $defaultCategory = Category::where('slug', 'general')->first();
+        if (!$defaultCategory) {
+            $defaultCategory = Category::create(['name' => 'General', 'slug' => 'general']);
+        }
 
         // Map column header aliases to attribute names
         $attributeColumnMap = [
@@ -611,10 +611,11 @@ class ProductController extends Controller
                     }
                 }
 
-                $currentCat = Category::firstOrCreate(
-                    ['name' => $cleanCategoryName],
-                    ['slug' => Str::slug($cleanCategoryName)]
-                );
+                $catSlug = Str::slug($cleanCategoryName) ?: 'general';
+                $currentCat = Category::where('slug', $catSlug)->first();
+                if (!$currentCat) {
+                    $currentCat = Category::create(['name' => $cleanCategoryName, 'slug' => $catSlug]);
+                }
 
                 $slug = Str::slug($currentTitle);
                 $existingCount = Product::where('slug', 'LIKE', "{$slug}%")->count();
