@@ -14,26 +14,8 @@ class ProductController extends Controller
 {
     private function saveBase64Image($base64String, $pathPrefix = 'products/')
     {
-        if (empty($base64String)) return $base64String;
-
-        if (preg_match('/^data:image\/([^;]+);base64,/', $base64String, $matches)) {
-            $imageData = substr($base64String, strpos($base64String, ',') + 1);
-            $type = strtolower($matches[1]);
-            if ($type === 'svg+xml') $type = 'svg';
-
-            $imageData = base64_decode($imageData);
-            if ($imageData === false) {
-                return $base64String;
-            }
-
-            $filename = $pathPrefix . uniqid() . '_' . time() . '.' . $type;
-            $disk = config('filesystems.default', 'public');
-            Storage::disk($disk)->put($filename, $imageData);
-            
-            $url = rtrim(config('app.url'), '/') . '/api/images/' . $filename;
-            return $url;
-        }
-
+        // To avoid ephemeral storage issues on Laravel Cloud without S3,
+        // we just save the Base64 string directly to the database.
         return $base64String;
     }
 
