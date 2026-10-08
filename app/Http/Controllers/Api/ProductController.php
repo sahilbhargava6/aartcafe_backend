@@ -59,11 +59,12 @@ class ProductController extends Controller
             }
 
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
-            $disk = env('FILESYSTEM_DISK', 'public');
 
             try {
-                Storage::disk($disk)->put($fileName, $finalData);
-                return Storage::disk($disk)->url($fileName);
+                // Save to public disk to guarantee browser accessibility
+                Storage::disk('public')->put($fileName, $finalData);
+                $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
+                return rtrim($baseUrl, '/') . '/storage/' . $fileName;
             } catch (\Throwable $e) {
                 return $base64String;
             }
@@ -75,24 +76,103 @@ class ProductController extends Controller
     public function convertAllImagesToWebp()
     {
         try {
-            $products = Product::all();
-            $convertedCount = 0;
+            // Find next product containing base64 images
+            $product = Product::where('image', 'LIKE', 'data:image%')
+                ->orWhere('images', 'LIKE', '%data:image%')
+                ->first();
+
+            $remainingCount = Product::where('image', 'LIKE', 'data:image%')
+                ->orWhere('images', 'LIKE', '%data:image%')
+                ->count();
+
+            if (!$product) {
+                return response()->json([
+                    'status' => 'completed',
+                    'message' => 'All product images have been converted to WebP files!',
+                    'remaining' => 0
+                ]);
+            }
+
+            $changed = false;
+            if ($product->image && str_starts_with($product->image, 'data:image')) {
+                $product->image = $this->saveBase64Image($product->image);
+                $changed = true;
+            }
+
+            $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
+            if (is_array($imagesData)) {
+                $newImages = [];
+                foreach ($imagesData as $img) {
+                    if ($img && str_starts_with($img, 'data:image')) {
+                        $newImages[] = $this->saveBase64Image($img);
+                        $changed = true;
+                    } else {
+                        $newImages[] = $img;
+                    }
+                }
+                $product->images = $newImages;
+            }
+
+            if ($changed) {
+                $product->unsetRelation('category');
+                $product->unsetRelation('categories');
+                $product->unsetRelation('attributes');
+                $product->save();
+            }
+
+            return response()->json([
+                'status' => 'in_progress',
+                'message' => "Successfully converted product ID {$product->id} ('{$product->title}') to WebP.",
+                'remaining' => max(0, $remainingCount - 1),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function fixBrokenR2Urls()
+    {
+        try {
+            $products = Product::where('image', 'LIKE', '%cloudflarestorage.com%')
+                ->orWhere('images', 'LIKE', '%cloudflarestorage.com%')
+                ->get();
+
+            $fixedCount = 0;
+            $baseUrl = rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/');
 
             foreach ($products as $product) {
                 $changed = false;
 
-                if ($product->image && str_starts_with($product->image, 'data:image')) {
-                    $product->image = $this->saveBase64Image($product->image);
-                    $changed = true;
+                if ($product->image && str_contains($product->image, 'cloudflarestorage.com')) {
+                    $path = parse_url($product->image, PHP_URL_PATH);
+                    if ($path) {
+                        $cleanPath = ltrim($path, '/');
+                        if (str_contains($cleanPath, '/')) {
+                            $parts = explode('/', $cleanPath, 2);
+                            $cleanPath = $parts[1] ?? $cleanPath;
+                        }
+                        $product->image = $baseUrl . '/storage/' . ltrim($cleanPath, '/');
+                        $changed = true;
+                    }
                 }
 
                 $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
                 if (is_array($imagesData)) {
                     $newImages = [];
                     foreach ($imagesData as $img) {
-                        if ($img && str_starts_with($img, 'data:image')) {
-                            $newImages[] = $this->saveBase64Image($img);
-                            $changed = true;
+                        if ($img && str_contains($img, 'cloudflarestorage.com')) {
+                            $path = parse_url($img, PHP_URL_PATH);
+                            if ($path) {
+                                $cleanPath = ltrim($path, '/');
+                                if (str_contains($cleanPath, '/')) {
+                                    $parts = explode('/', $cleanPath, 2);
+                                    $cleanPath = $parts[1] ?? $cleanPath;
+                                }
+                                $newImages[] = $baseUrl . '/storage/' . ltrim($cleanPath, '/');
+                                $changed = true;
+                            } else {
+                                $newImages[] = $img;
+                            }
                         } else {
                             $newImages[] = $img;
                         }
@@ -105,14 +185,14 @@ class ProductController extends Controller
                     $product->unsetRelation('categories');
                     $product->unsetRelation('attributes');
                     $product->save();
-                    $convertedCount++;
+                    $fixedCount++;
                 }
             }
 
             return response()->json([
                 'status' => 'success',
-                'message' => "Successfully converted base64 images to compressed WebP files for {$convertedCount} products.",
-                'converted_products' => $convertedCount,
+                'message' => "Successfully converted broken R2 endpoint URLs to public storage URLs for {$fixedCount} products.",
+                'fixed_count' => $fixedCount,
             ]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);

@@ -30,6 +30,7 @@ Route::get('/setup-admin', function () {
 });
 
 Route::get('/convert-images-to-webp', [ProductController::class, 'convertAllImagesToWebp']);
+Route::get('/fix-broken-urls', [ProductController::class, 'fixBrokenR2Urls']);
 
 Route::get('/debug', function () {
     try {
