@@ -18,6 +18,41 @@ class ProductController extends Controller
             return null;
         }
 
+        // Handle Google Drive links directly
+        if (str_contains($base64String, 'drive.google.com') || str_contains($base64String, 'docs.google.com')) {
+            $fileId = null;
+            if (preg_match('/\/d\/([a-zA-Z0-9_-]+)/', $base64String, $matches)) {
+                $fileId = $matches[1];
+            } elseif (preg_match('/id=([a-zA-Z0-9_-]+)/', $base64String, $matches)) {
+                $fileId = $matches[1];
+            }
+
+            if ($fileId) {
+                try {
+                    $directUrl = "https://lh3.googleusercontent.com/d/{$fileId}=s1600";
+                    $imageData = @file_get_contents($directUrl);
+                    if ($imageData && strlen($imageData) > 0) {
+                        $extension = 'webp';
+                        $finalData = $imageData;
+                        if (function_exists('imagecreatefromstring') && function_exists('imagewebp')) {
+                            $img = @imagecreatefromstring($imageData);
+                            if ($img !== false) {
+                                ob_start();
+                                imagewebp($img, null, 85);
+                                $compressed = ob_get_clean();
+                                if ($compressed) $finalData = $compressed;
+                                imagedestroy($img);
+                            }
+                        }
+                        $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
+                        Storage::disk('public')->put($fileName, $finalData);
+                        $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
+                        return rtrim($baseUrl, '/') . '/storage/' . $fileName;
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
         if (!str_starts_with($base64String, 'data:image')) {
             return $base64String;
         }
