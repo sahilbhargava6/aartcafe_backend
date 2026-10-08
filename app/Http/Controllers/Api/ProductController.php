@@ -742,25 +742,29 @@ class ProductController extends Controller
             $products = Product::all();
 
             // Extract all [FileID, Title] pairs embedded in Google Drive page data
-            preg_match_all('/\["([a-zA-Z0-9_-]{25,})",\[?"([^"]+)"/i', $html, $allMatches, PREG_SET_ORDER);
+            preg_match_all('/\["([a-zA-Z0-9_-]{25,})",\[?"([^"]+?)"/iu', $html, $matches1, PREG_SET_ORDER);
+            preg_match_all('/"([a-zA-Z0-9_-]{25,})",\["([^"]+?)"/iu', $html, $matches2, PREG_SET_ORDER);
 
             $driveFiles = [];
-            foreach ($allMatches as $m) {
+            foreach (array_merge($matches1, $matches2) as $m) {
                 $fId = $m[1];
-                $fName = $m[2];
-                $driveFiles[$fName] = $fId;
+                $fName = trim($m[2]);
+                if (strlen($fName) > 1 && !str_starts_with($fName, 'http')) {
+                    $driveFiles[$fName] = $fId;
+                }
             }
 
             foreach ($products as $product) {
                 $matchedFileId = null;
+                $prodTitle = trim($product->title);
                 
                 // 1. Direct match by exact title
-                if (isset($driveFiles[$product->title])) {
-                    $matchedFileId = $driveFiles[$product->title];
+                if (isset($driveFiles[$prodTitle])) {
+                    $matchedFileId = $driveFiles[$prodTitle];
                 } else {
                     // 2. Fuzzy match title in Google Drive filenames/folder names
                     foreach ($driveFiles as $name => $fId) {
-                        if (str_contains(strtolower($name), strtolower($product->title)) || str_contains(strtolower($product->title), strtolower($name))) {
+                        if (stripos($name, $prodTitle) !== false || stripos($prodTitle, $name) !== false) {
                             $matchedFileId = $fId;
                             break;
                         }
@@ -769,9 +773,9 @@ class ProductController extends Controller
 
                 // 3. Regex fallback in raw HTML
                 if (!$matchedFileId) {
-                    $normalizedTitle = preg_quote($product->title, '/');
-                    if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches) ||
-                        preg_match('/\["([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/i', $html, $subMatches)) {
+                    $normalizedTitle = preg_quote($prodTitle, '/');
+                    if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/iu', $html, $subMatches) ||
+                        preg_match('/"([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/iu', $html, $subMatches)) {
                         $matchedFileId = $subMatches[1];
                     }
                 }
