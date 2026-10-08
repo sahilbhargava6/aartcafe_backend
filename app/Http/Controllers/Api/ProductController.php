@@ -737,16 +737,47 @@ class ProductController extends Controller
                 return response()->json(['error' => 'Unable to read the Google Drive folder. Please ensure the link sharing is set to "Anyone with the link".'], 400);
             }
 
+            // Parse Google Drive JSON payload from folder page
             $matchedCount = 0;
             $products = Product::all();
 
+            // Extract all [FileID, Title] pairs embedded in Google Drive page data
+            preg_match_all('/\["([a-zA-Z0-9_-]{25,})",\[?"([^"]+)"/i', $html, $allMatches, PREG_SET_ORDER);
+
+            $driveFiles = [];
+            foreach ($allMatches as $m) {
+                $fId = $m[1];
+                $fName = $m[2];
+                $driveFiles[$fName] = $fId;
+            }
+
             foreach ($products as $product) {
-                // Look for product title or file ID patterns in the Google Drive folder HTML payload
-                $normalizedTitle = preg_quote($product->title, '/');
-                if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches) ||
-                    preg_match('/\["([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/i', $html, $subMatches)) {
-                    $fileId = $subMatches[1];
-                    $directUrl = "https://lh3.googleusercontent.com/d/{$fileId}=s1600";
+                $matchedFileId = null;
+                
+                // 1. Direct match by exact title
+                if (isset($driveFiles[$product->title])) {
+                    $matchedFileId = $driveFiles[$product->title];
+                } else {
+                    // 2. Fuzzy match title in Google Drive filenames/folder names
+                    foreach ($driveFiles as $name => $fId) {
+                        if (str_contains(strtolower($name), strtolower($product->title)) || str_contains(strtolower($product->title), strtolower($name))) {
+                            $matchedFileId = $fId;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. Regex fallback in raw HTML
+                if (!$matchedFileId) {
+                    $normalizedTitle = preg_quote($product->title, '/');
+                    if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/i', $html, $subMatches) ||
+                        preg_match('/\["([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/i', $html, $subMatches)) {
+                        $matchedFileId = $subMatches[1];
+                    }
+                }
+
+                if ($matchedFileId) {
+                    $directUrl = "https://lh3.googleusercontent.com/d/{$matchedFileId}=s1600";
                     $imageData = @file_get_contents($directUrl, false, $context);
                     if ($imageData && strlen($imageData) > 0) {
                         $img = @imagecreatefromstring($imageData);
