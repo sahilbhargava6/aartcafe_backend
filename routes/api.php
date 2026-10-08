@@ -32,6 +32,30 @@ Route::get('/setup-admin', function () {
 Route::get('/convert-images-to-webp', [ProductController::class, 'convertAllImagesToWebp']);
 Route::get('/fix-broken-urls', [ProductController::class, 'fixBrokenR2Urls']);
 Route::match(['get', 'post'], '/sync-gdrive-folder', [ProductController::class, 'syncGoogleDriveFolder']);
+Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $request, \App\Models\Product $product) {
+    if ($request->has('image')) {
+        $img = $request->input('image');
+        if (str_starts_with($img, 'data:image')) {
+            $product->image = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+        }
+    }
+    if ($request->has('images') && is_array($request->input('images'))) {
+        $newImages = [];
+        foreach ($request->input('images') as $img) {
+            if (str_starts_with($img, 'data:image')) {
+                $newImages[] = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+            } else {
+                $newImages[] = $img;
+            }
+        }
+        $product->images = $newImages;
+    }
+    $product->unsetRelation('category');
+    $product->unsetRelation('categories');
+    $product->unsetRelation('attributes');
+    $product->save();
+    return response()->json(['status' => 'success', 'product_id' => $product->id]);
+});
 
 Route::get('/debug', function () {
     try {
