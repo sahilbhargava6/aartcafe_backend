@@ -18,25 +18,51 @@ class ProductController extends Controller
             return null;
         }
 
-        // If it's a base64 encoded image, save as file to public disk / S3
+        if (!str_starts_with($base64String, 'data:image')) {
+            return $base64String;
+        }
+
         if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $type)) {
             $data = substr($base64String, strpos($base64String, ',') + 1);
-            $type = strtolower($type[1]);
-
-            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
-                $type = 'jpeg';
-            }
-
             $decodedData = base64_decode($data);
             if ($decodedData === false) {
                 return $base64String;
             }
 
-            $fileName = $pathPrefix . Str::random(24) . '.' . $type;
+            // Compress & convert image to high-efficiency WebP format
+            $finalData = $decodedData;
+            $extension = 'webp';
+
+            if (function_exists('imagecreatefromstring') && function_exists('imagewebp')) {
+                try {
+                    $image = @imagecreatefromstring($decodedData);
+                    if ($image !== false) {
+                        ob_start();
+                        imagewebp($image, null, 85);
+                        $compressed = ob_get_clean();
+                        if ($compressed && strlen($compressed) > 0) {
+                            $finalData = $compressed;
+                        }
+                        imagedestroy($image);
+                    }
+                } catch (\Throwable $e) {
+                    $extension = strtolower($type[1]);
+                    if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'])) {
+                        $extension = 'jpeg';
+                    }
+                }
+            } else {
+                $extension = strtolower($type[1]);
+                if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'])) {
+                    $extension = 'jpeg';
+                }
+            }
+
+            $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
             $disk = env('FILESYSTEM_DISK', 'public');
 
             try {
-                Storage::disk($disk)->put($fileName, $decodedData);
+                Storage::disk($disk)->put($fileName, $finalData);
                 return Storage::disk($disk)->url($fileName);
             } catch (\Throwable $e) {
                 return $base64String;
