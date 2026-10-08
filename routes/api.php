@@ -35,6 +35,7 @@ Route::get('/setup-admin', function () {
 Route::get('/convert-images-to-webp', [ProductController::class, 'convertAllImagesToWebp']);
 Route::get('/fix-broken-urls', [ProductController::class, 'fixBrokenR2Urls']);
 Route::match(['get', 'post'], '/sync-gdrive-folder', [ProductController::class, 'syncGoogleDriveFolder']);
+Route::post('/products/{product}/upload-images', [ProductController::class, 'uploadProductImages']);
 Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $request, \App\Models\Product $product) {
     if ($request->has('image')) {
         $img = $request->input('image');

@@ -816,4 +816,55 @@ class ProductController extends Controller
             return response()->json(['error' => $e->getMessage(), 'line' => $e->getLine()], 500);
         }
     }
+
+    public function uploadProductImages(Request $request, Product $product)
+    {
+        try {
+            $uploadedFiles = $request->file('images');
+            if (empty($uploadedFiles)) {
+                return response()->json(['error' => 'No image files provided.'], 400);
+            }
+
+            $replace = filter_var($request->input('replace', false), FILTER_VALIDATE_BOOLEAN);
+
+            $newUrls = [];
+            foreach ($uploadedFiles as $file) {
+                if (!$file->isValid()) continue;
+                $mime = $file->getClientMimeType() ?: 'image/jpeg';
+                $contents = file_get_contents($file->getRealPath());
+                if (empty($contents)) continue;
+                $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($contents);
+                $savedUrl = $this->saveBase64Image($dataUrl);
+                if ($savedUrl) {
+                    $newUrls[] = $savedUrl;
+                }
+            }
+
+            if (!empty($newUrls)) {
+                if ($replace || empty($product->image) || str_contains($product->image, 'unsplash.com') || str_contains($product->image, 'placeholder')) {
+                    $product->image = $newUrls[0];
+                }
+
+                $existingImages = $replace ? [] : (is_array($product->images) ? $product->images : (json_decode($product->images, true) ?? []));
+                if (!is_array($existingImages)) $existingImages = [];
+
+                $mergedImages = array_values(array_unique(array_merge($existingImages, $newUrls)));
+                $product->images = $mergedImages;
+
+                $product->unsetRelation('category');
+                $product->unsetRelation('categories');
+                $product->unsetRelation('attributes');
+                $product->save();
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'uploaded_count' => count($newUrls),
+                'total_images' => count($product->images ?? []),
+                'main_image' => $product->image
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage(), 'line' => $e->getLine()], 500);
+        }
+    }
 }
