@@ -35,8 +35,12 @@ class ProductController extends Controller
             $fileName = $pathPrefix . Str::random(24) . '.' . $type;
             $disk = env('FILESYSTEM_DISK', 'public');
 
-            Storage::disk($disk)->put($fileName, $decodedData);
-            return Storage::disk($disk)->url($fileName);
+            try {
+                Storage::disk($disk)->put($fileName, $decodedData);
+                return Storage::disk($disk)->url($fileName);
+            } catch (\Throwable $e) {
+                return $base64String;
+            }
         }
 
         return $base64String;
