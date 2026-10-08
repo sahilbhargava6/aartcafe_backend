@@ -72,45 +72,51 @@ class ProductController extends Controller
         return $base64String;
     }
 
-    public function fixImages()
+    public function convertAllImagesToWebp()
     {
-        $product = Product::where('image', 'LIKE', 'data:image%')
-            ->orWhere('images', 'LIKE', '%data:image%')
-            ->first();
+        try {
+            $products = Product::all();
+            $convertedCount = 0;
 
-        if (!$product) {
-            return response()->json(['message' => 'No more products to fix.', 'done' => true]);
-        }
+            foreach ($products as $product) {
+                $changed = false;
 
-        $changed = false;
-        if ($product->image && str_starts_with($product->image, 'data:image')) {
-            $product->image = $this->saveBase64Image($product->image);
-            $changed = true;
-        }
-        
-        $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
-        if (is_array($imagesData)) {
-            $newImages = [];
-            foreach ($imagesData as $img) {
-                if ($img && str_starts_with($img, 'data:image')) {
-                    $newImages[] = $this->saveBase64Image($img);
+                if ($product->image && str_starts_with($product->image, 'data:image')) {
+                    $product->image = $this->saveBase64Image($product->image);
                     $changed = true;
-                } else {
-                    $newImages[] = $img;
+                }
+
+                $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
+                if (is_array($imagesData)) {
+                    $newImages = [];
+                    foreach ($imagesData as $img) {
+                        if ($img && str_starts_with($img, 'data:image')) {
+                            $newImages[] = $this->saveBase64Image($img);
+                            $changed = true;
+                        } else {
+                            $newImages[] = $img;
+                        }
+                    }
+                    $product->images = $newImages;
+                }
+
+                if ($changed) {
+                    $product->unsetRelation('category');
+                    $product->unsetRelation('categories');
+                    $product->unsetRelation('attributes');
+                    $product->save();
+                    $convertedCount++;
                 }
             }
-            $product->images = $newImages;
-        }
 
-        if ($changed) {
-            // Unset relation so we don't try to save them
-            $product->unsetRelation('category');
-            $product->unsetRelation('categories');
-            $product->unsetRelation('attributes');
-            $product->save();
+            return response()->json([
+                'status' => 'success',
+                'message' => "Successfully converted base64 images to compressed WebP files for {$convertedCount} products.",
+                'converted_products' => $convertedCount,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        return response()->json(['message' => 'Fixed images for product ID ' . $product->id, 'done' => false]);
     }
 
     public function index(Request $request)

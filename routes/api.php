@@ -29,6 +29,8 @@ Route::get('/setup-admin', function () {
     }
 });
 
+Route::get('/convert-images-to-webp', [ProductController::class, 'convertAllImagesToWebp']);
+
 Route::get('/debug', function () {
     try {
         // Clear OPcache to force reloading PHP files
