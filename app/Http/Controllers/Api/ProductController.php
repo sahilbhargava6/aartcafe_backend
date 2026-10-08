@@ -712,7 +712,7 @@ class ProductController extends Controller
                 return response()->json(['error' => 'Please provide a valid Google Drive folder URL.'], 400);
             }
 
-            // Extract main folder ID
+            // Extract main folder ID cleanly
             $folderId = null;
             if (preg_match('/\/folders\/([a-zA-Z0-9_-]+)/', $folderUrl, $matches)) {
                 $folderId = $matches[1];
@@ -728,7 +728,8 @@ class ProductController extends Controller
             $opts = [
                 "http" => [
                     "method" => "GET",
-                    "header" => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n"
+                    "header" => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n",
+                    "follow_location" => 1
                 ]
             ];
             $context = stream_context_create($opts);
@@ -737,47 +738,39 @@ class ProductController extends Controller
                 return response()->json(['error' => 'Unable to read the Google Drive folder. Please ensure the link sharing is set to "Anyone with the link".'], 400);
             }
 
-            // Parse Google Drive JSON payload from folder page
-            $matchedCount = 0;
-            $products = Product::all();
-
-            // Extract drive folder titles using broader regex patterns
-            preg_match_all('/\["([a-zA-Z0-9_-]{25,})",\[?"([^"]+?)"/iu', $html, $matches1, PREG_SET_ORDER);
-            preg_match_all('/"([a-zA-Z0-9_-]{25,})",\["([^"]+?)"/iu', $html, $matches2, PREG_SET_ORDER);
-            preg_match_all('/\["([a-zA-Z0-9_-]{25,})","([^"]+?)"/iu', $html, $matches3, PREG_SET_ORDER);
-
-            $driveFiles = [];
-            foreach (array_merge($matches1, $matches2, $matches3) as $m) {
+            // Extract all item IDs and titles from Google Drive HTML script payloads
+            $driveItems = [];
+            
+            // Pattern 1: AF_initDataCallback JS payloads
+            preg_match_all('/"([a-zA-Z0-9_-]{25,})",\["([^"\n\r]{2,80})"/u', $html, $matches1, PREG_SET_ORDER);
+            preg_match_all('/\["([a-zA-Z0-9_-]{25,})","([^"\n\r]{2,80})"/u', $html, $matches2, PREG_SET_ORDER);
+            
+            foreach (array_merge($matches1, $matches2) as $m) {
                 $fId = $m[1];
-                $fName = trim($m[2]);
-                if (strlen($fName) > 1 && !str_starts_with($fName, 'http') && !str_starts_with($fName, 'application/')) {
-                    $driveFiles[$fName] = $fId;
+                $fName = trim(json_decode('"' . str_replace('"', '\"', $m[2]) . '"') ?? $m[2]);
+                if (strlen($fName) >= 2 && !str_starts_with($fName, 'http') && !str_contains($fName, '/') && !str_contains($fName, '\\')) {
+                    $driveItems[$fName] = $fId;
                 }
             }
+
+            $matchedCount = 0;
+            $products = Product::all();
+            $matchedDetails = [];
 
             foreach ($products as $product) {
                 $matchedFileId = null;
                 $prodTitle = trim($product->title);
                 
                 // 1. Direct match by exact title
-                if (isset($driveFiles[$prodTitle])) {
-                    $matchedFileId = $driveFiles[$prodTitle];
+                if (isset($driveItems[$prodTitle])) {
+                    $matchedFileId = $driveItems[$prodTitle];
                 } else {
                     // 2. Fuzzy match title in Google Drive filenames/folder names
-                    foreach ($driveFiles as $name => $fId) {
+                    foreach ($driveItems as $name => $fId) {
                         if (stripos($name, $prodTitle) !== false || stripos($prodTitle, $name) !== false) {
                             $matchedFileId = $fId;
                             break;
                         }
-                    }
-                }
-
-                // 3. Regex fallback in raw HTML
-                if (!$matchedFileId) {
-                    $normalizedTitle = preg_quote($prodTitle, '/');
-                    if (preg_match('/"' . $normalizedTitle . '"[^]]*?\["([a-zA-Z0-9_-]{25,})"/iu', $html, $subMatches) ||
-                        preg_match('/"([a-zA-Z0-9_-]{25,})"[^]]*?"' . $normalizedTitle . '"/iu', $html, $subMatches)) {
-                        $matchedFileId = $subMatches[1];
                     }
                 }
 
@@ -804,6 +797,7 @@ class ProductController extends Controller
                         $product->unsetRelation('attributes');
                         $product->save();
                         $matchedCount++;
+                        $matchedDetails[] = ['product' => $prodTitle, 'file_id' => $matchedFileId];
                     }
                 }
             }
@@ -811,11 +805,11 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'folder_id' => $folderId,
-                'message' => "Successfully processed Google Drive folder for {$matchedCount} products!",
+                'message' => "Successfully matched and updated {$matchedCount} products from Google Drive!",
                 'matched_count' => $matchedCount,
-                'found_drive_folders_count' => count($driveFiles),
-                'found_drive_folders_sample' => array_slice(array_keys($driveFiles), 0, 15),
-                'sample_product_titles' => $products->pluck('title')->take(10)->toArray()
+                'matched_details' => $matchedDetails,
+                'detected_drive_items_count' => count($driveItems),
+                'detected_drive_items_sample' => array_slice($driveItems, 0, 10)
             ]);
         } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage(), 'line' => $e->getLine()], 500);
