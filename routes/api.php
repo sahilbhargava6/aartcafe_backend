@@ -17,13 +17,16 @@ use App\Http\Controllers\Api\AuthController;
 
 Route::get('/setup-admin', function () {
     try {
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
         \Illuminate\Support\Facades\Artisan::call('route:clear');
         \Illuminate\Support\Facades\Artisan::call('config:clear');
         \Illuminate\Support\Facades\Artisan::call('cache:clear');
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
         \Illuminate\Support\Facades\Artisan::call('storage:link'); // Added to fix broken images
         $prodsCount = \App\Models\Product::count();
-        return response()->json(['status' => 'ok', 'count' => $prodsCount, 'version' => '2026-10-07-fix-v3']);
+        return response()->json(['status' => 'ok', 'count' => $prodsCount, 'version' => '2026-10-09-attributes-fix-v1']);
     } catch (\Throwable $e) {
         return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
     }
