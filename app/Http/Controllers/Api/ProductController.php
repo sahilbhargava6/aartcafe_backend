@@ -146,16 +146,14 @@ class ProductController extends Controller
                 $changed = false;
 
                 // Fix single main image
-                if (!empty($product->image)) {
+                if (!empty($product->image) && !str_starts_with($product->image, 'data:image')) {
                     $img = $product->image;
-                    if (str_contains($img, 'cloudflarestorage.com') || str_contains($img, '/storage/')) {
-                        $filename = basename($img);
-                        if (!empty($filename) && !str_starts_with($img, 'data:image')) {
-                            $newUrl = $baseUrl . '/storage/products/' . $filename;
-                            if ($product->image !== $newUrl) {
-                                $product->image = $newUrl;
-                                $changed = true;
-                            }
+                    $filename = basename(parse_url($img, PHP_URL_PATH));
+                    if (!empty($filename)) {
+                        $newUrl = $baseUrl . '/storage/products/' . $filename;
+                        if ($product->image !== $newUrl) {
+                            $product->image = $newUrl;
+                            $changed = true;
                         }
                     }
                 }
@@ -165,9 +163,9 @@ class ProductController extends Controller
                 if (is_array($imagesData)) {
                     $newImages = [];
                     foreach ($imagesData as $img) {
-                        if (!empty($img) && (str_contains($img, 'cloudflarestorage.com') || str_contains($img, '/storage/'))) {
-                            $filename = basename($img);
-                            if (!empty($filename) && !str_starts_with($img, 'data:image')) {
+                        if (!empty($img) && !str_starts_with($img, 'data:image')) {
+                            $filename = basename(parse_url($img, PHP_URL_PATH));
+                            if (!empty($filename)) {
                                 $newImages[] = $baseUrl . '/storage/products/' . $filename;
                                 $changed = true;
                             } else {
