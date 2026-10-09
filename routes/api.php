@@ -2,6 +2,27 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ProductController;
+
+Route::get('/clear-base64', function () {
+    try {
+        \Illuminate\Support\Facades\DB::table('products')
+            ->where('image', 'LIKE', 'data:image%')
+            ->update(['image' => null]);
+            
+        $products = \App\Models\Product::where('images', 'LIKE', '%data:image%')->get();
+        foreach($products as $p) {
+            $p->images = null;
+            $p->save();
+        }
+        return 'Cleared base64';
+    } catch (\Throwable $e) {
+        return $e->getMessage();
+    }
+});
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CategoryController;
