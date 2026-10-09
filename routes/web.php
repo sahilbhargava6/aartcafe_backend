@@ -21,11 +21,39 @@ Route::get('/test-db-products', function () {
 
 
 
-// Serve uploaded images directly if storage symlink is missing on Laravel Cloud
+// Serve uploaded images directly from the default disk (Bucket)
+// Serve uploaded images directly from the default disk (Bucket)
 Route::get('/storage/{path}', function ($path) {
-    $filePath = 'public/' . $path;
-    if (!Storage::exists($filePath)) {
+    if (!Storage::exists($path)) {
         abort(404);
     }
-    return Storage::response($filePath);
+    return Storage::response($path);
 })->where('path', '.*');
+
+Route::get('/fix-urls', function () {
+    $r2_host = 'https://fls-a2848454-7b7d-43e9-8b54-ef5486fde2ea.367be3a2035528943240074d0096e0cd.r2.cloudflarestorage.com';
+    $proxy_host = 'https://aartcafe-backend-production-rjudvs.laravel.cloud/storage';
+    $products = App\Models\Product::all();
+    $count = 0;
+    foreach ($products as $p) {
+        $updated = false;
+        if ($p->image && str_contains($p->image, $r2_host)) {
+            $p->image = str_replace($r2_host, $proxy_host, $p->image);
+            $updated = true;
+        }
+        $imgs = $p->images;
+        if (is_array($imgs)) {
+            $newImgs = [];
+            foreach ($imgs as $i) {
+                $newImgs[] = str_replace($r2_host, $proxy_host, $i);
+            }
+            $p->images = $newImgs;
+            $updated = true;
+        }
+        if ($updated) {
+            $p->save();
+            $count++;
+        }
+    }
+    return "Fixed $count products!";
+});
