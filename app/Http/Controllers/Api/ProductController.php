@@ -836,13 +836,11 @@ class ProductController extends Controller
             $newUrls = [];
             foreach ($uploadedFiles as $file) {
                 if (!$file->isValid()) continue;
-                $mime = $file->getClientMimeType() ?: 'image/jpeg';
-                $contents = file_get_contents($file->getRealPath());
-                if (empty($contents)) continue;
-                $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($contents);
-                $savedUrl = $this->saveBase64Image($dataUrl);
-                if ($savedUrl) {
-                    $newUrls[] = $savedUrl;
+                
+                // Use streaming upload to prevent out of memory errors
+                $path = $file->store('products', 's3');
+                if ($path) {
+                    $newUrls[] = \Illuminate\Support\Facades\Storage::disk('s3')->url($path);
                 }
             }
 
