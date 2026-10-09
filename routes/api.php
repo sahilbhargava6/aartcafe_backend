@@ -203,32 +203,3 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/pages/{page}', [PageController::class, 'destroy']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 });
-
-
-Route::get('/fix-urls', function () {
-     = 'https://fls-a2848454-7b7d-43e9-8b54-ef5486fde2ea.367be3a2035528943240074d0096e0cd.r2.cloudflarestorage.com';
-     = 'https://aartcafe-backend-production-rjudvs.laravel.cloud/storage';
-     = App\Models\Product::all();
-     = 0;
-    foreach ( as ) {
-         = false;
-        if (->image && str_contains(->image, )) {
-            ->image = str_replace(, , ->image);
-             = true;
-        }
-         = ->images;
-        if (is_array()) {
-             = [];
-            foreach ( as ) {
-                [] = str_replace(, , );
-            }
-            ->images = ;
-             = true;
-        }
-        if () {
-            ->save();
-            ++;
-        }
-    }
-    return " Fixed  products!;
-});
