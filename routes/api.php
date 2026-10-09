@@ -1,9 +1,5 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\ProductController;
-
 Route::get('/clear-base64', function () {
     try {
         \Illuminate\Support\Facades\DB::table('products')
