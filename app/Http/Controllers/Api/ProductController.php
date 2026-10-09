@@ -96,11 +96,12 @@ class ProductController extends Controller
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
             try {
-                // Force save to S3 disk since Laravel Cloud might default to public
-                Storage::disk('s3')->put($fileName, $finalData);
-                return Storage::disk('s3')->url($fileName);
+                // Force save to public disk since AWS credentials are not configured
+                Storage::disk('public')->put($fileName, $finalData);
+                $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
+                return rtrim($baseUrl, '/') . '/storage/' . $fileName;
             } catch (\Throwable $e) {
-                \Log::error('S3 Upload Failed: ' . $e->getMessage());
+                \Log::error('Upload Failed: ' . $e->getMessage());
                 return null;
             }
         }
@@ -838,9 +839,9 @@ class ProductController extends Controller
                 if (!$file->isValid()) continue;
                 
                 // Use streaming upload to prevent out of memory errors
-                $path = $file->store('products', 's3');
+                $path = $file->store('products', 'public');
                 if ($path) {
-                    $newUrls[] = \Illuminate\Support\Facades\Storage::disk('s3')->url($path);
+                    $newUrls[] = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
                 }
             }
 
