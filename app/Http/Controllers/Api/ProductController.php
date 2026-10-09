@@ -100,7 +100,8 @@ class ProductController extends Controller
                 Storage::disk('s3')->put($fileName, $finalData);
                 return Storage::disk('s3')->url($fileName);
             } catch (\Throwable $e) {
-                return $base64String;
+                \Log::error('S3 Upload Failed: ' . $e->getMessage());
+                return null;
             }
         }
 
@@ -236,6 +237,9 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
+            // Emergency clear base64 to fix OOM
+            \Illuminate\Support\Facades\DB::table('products')->where('image', 'LIKE', 'data:image%')->update(['image' => null]);
+            
             // Optimized column selection & lightweight eager loading to prevent OOM
             $query = Product::select([
                 'id',
