@@ -96,10 +96,9 @@ class ProductController extends Controller
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
             try {
-                // Save to public disk to guarantee browser accessibility
-                Storage::disk('public')->put($fileName, $finalData);
-                $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
-                return rtrim($baseUrl, '/') . '/storage/' . $fileName;
+                // Save to default disk (which is S3 on Laravel Cloud)
+                Storage::put($fileName, $finalData);
+                return Storage::url($fileName);
             } catch (\Throwable $e) {
                 return $base64String;
             }
