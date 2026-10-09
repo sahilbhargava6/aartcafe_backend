@@ -96,9 +96,9 @@ class ProductController extends Controller
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
             try {
-                // Save to default disk (which is S3 on Laravel Cloud)
-                Storage::put($fileName, $finalData);
-                return Storage::url($fileName);
+                // Force save to S3 disk since Laravel Cloud might default to public
+                Storage::disk('s3')->put($fileName, $finalData);
+                return Storage::disk('s3')->url($fileName);
             } catch (\Throwable $e) {
                 return $base64String;
             }
