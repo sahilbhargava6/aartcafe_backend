@@ -329,7 +329,8 @@ class ProductController extends Controller
         if ($request->has('attributes')) {
             foreach ($request->input('attributes') as $attrData) {
                 $attribute = $product->attributes()->create([
-                    'name' => $attrData['name']
+                    'name' => $attrData['name'],
+                    'type' => $attrData['type'] ?? 'checkbox'
                 ]);
                 foreach ($attrData['values'] as $valData) {
                     $attribute->values()->create([
@@ -396,7 +397,8 @@ class ProductController extends Controller
 
             foreach ($request->input('attributes') as $attrData) {
                 $attribute = $product->attributes()->create([
-                    'name' => $attrData['name']
+                    'name' => $attrData['name'],
+                    'type' => $attrData['type'] ?? 'checkbox'
                 ]);
                 foreach ($attrData['values'] as $valData) {
                     $attribute->values()->create([
