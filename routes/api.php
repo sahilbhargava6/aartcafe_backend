@@ -54,10 +54,12 @@ Route::get('/fix-broken-urls', [ProductController::class, 'fixBrokenR2Urls']);
 Route::match(['get', 'post'], '/sync-gdrive-folder', [ProductController::class, 'syncGoogleDriveFolder']);
 Route::post('/products/{product}/upload-images', [ProductController::class, 'uploadProductImages']);
 Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $request, \App\Models\Product $product) {
+    $debugUrl = 'none';
     if ($request->has('image')) {
         $img = $request->input('image');
         if (str_starts_with($img, 'data:image')) {
             $url = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+            $debugUrl = $url;
             if ($url) $product->image = $url;
         }
     }
@@ -77,7 +79,7 @@ Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $r
     $product->unsetRelation('categories');
     $product->unsetRelation('attributes');
     $product->save();
-    return response()->json(['status' => 'success', 'product_id' => $product->id, 'image' => $product->image]);
+    return response()->json(['status' => 'success', 'product_id' => $product->id, 'image' => $product->image, 'debug_url' => $debugUrl]);
 });
 
 Route::get('/debug', function () {
