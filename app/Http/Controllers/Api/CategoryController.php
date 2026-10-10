@@ -11,14 +11,15 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        return response()->json(Category::withCount('products')->get());
+        return response()->json(Category::with(['parent', 'children'])->withCount('products')->get());
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|unique:categories,slug'
+            'slug' => 'nullable|string|unique:categories,slug',
+            'parent_id' => 'nullable|exists:categories,id'
         ]);
 
         if (empty($validated['slug'])) {
@@ -38,8 +39,14 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'slug' => 'sometimes|required|string|unique:categories,slug,' . $category->id
+            'slug' => 'sometimes|required|string|unique:categories,slug,' . $category->id,
+            'parent_id' => 'nullable|exists:categories,id'
         ]);
+
+        // Prevent self-referencing parent
+        if (isset($validated['parent_id']) && $validated['parent_id'] == $category->id) {
+            return response()->json(['message' => 'Category cannot be its own parent.'], 422);
+        }
 
         $category->update($validated);
         return response()->json($category);
