@@ -21,7 +21,6 @@ Route::get('/test-db-products', function () {
 
 
 
-// Serve uploaded images directly from the default disk (Bucket)
 Route::get('/media/{path}', function ($path) {
     try {
         if (!Storage::disk('s3')->exists($path)) {
@@ -29,11 +28,16 @@ Route::get('/media/{path}', function ($path) {
             if (Storage::disk('public')->exists($path)) {
                 return Storage::disk('public')->response($path);
             }
-            abort(404);
+            return response()->json(['error' => 'File not found on s3 or public', 'path' => $path], 404);
         }
         return Storage::disk('s3')->response($path);
     } catch (\Throwable $e) {
-        abort(404);
+        return response()->json([
+            'error' => 'Exception in media proxy',
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ], 500);
     }
 })->where('path', '.*');
 
