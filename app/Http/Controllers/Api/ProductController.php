@@ -45,9 +45,9 @@ class ProductController extends Controller
                             }
                         }
                         $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
-                        Storage::disk('public')->put($fileName, $finalData);
+                        Storage::disk('s3')->put($fileName, $finalData, 'public');
                         $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
-                        return rtrim($baseUrl, '/') . '/storage/' . $fileName;
+                        return rtrim($baseUrl, '/') . '/media/' . $fileName;
                     }
                 } catch (\Throwable $e) {}
             }
@@ -96,9 +96,9 @@ class ProductController extends Controller
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
             try {
-                // Force save to the default disk (Laravel Cloud Bucket)
-                Storage::put($fileName, $finalData);
-                return Storage::url($fileName);
+                // Force save to the s3 disk (Cloudflare R2 Bucket)
+                Storage::disk('s3')->put($fileName, $finalData, 'public');
+                return env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud') . '/media/' . $fileName;
             } catch (\Throwable $e) {
                 \Log::error('Upload Failed: ' . $e->getMessage());
                 return null;
