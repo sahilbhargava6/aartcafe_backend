@@ -95,9 +95,16 @@ class ProductController extends Controller
 
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
-            // Use public disk which Laravel Cloud maps to R2 automatically
-            Storage::disk('public')->put($fileName, $finalData);
-            return Storage::disk('public')->url($fileName);
+            // Attempt to save to S3 (R2 on Laravel Cloud) for permanent storage
+            try {
+                Storage::disk('s3')->put($fileName, $finalData, 'public');
+                $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
+                return rtrim($baseUrl, '/') . '/media/' . $fileName;
+            } catch (\Throwable $e) {
+                // Fallback for local development
+                Storage::disk('public')->put($fileName, $finalData);
+                return Storage::disk('public')->url($fileName);
+            }
         }
 
         return $base64String;
@@ -251,7 +258,7 @@ class ProductController extends Controller
                 'is_festive_special',
                 'is_active',
                 'created_at',
-            ])->with(['category:id,name', 'categories:id,name', 'attributes.values']);
+            ])->with(['category:id,name', 'categories:id,name', 'attributes.values.parent.attribute']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
@@ -358,7 +365,7 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load(['category', 'categories', 'attributes.values']), 201);
+        return response()->json($product->load(['category', 'categories', 'attributes.values.parent.attribute']), 201);
     }
 
     public function update(Request $request, Product $product)
@@ -448,7 +455,7 @@ class ProductController extends Controller
             }
         }
 
-        return response()->json($product->load(['category', 'attributes.values']));
+        return response()->json($product->load(['category', 'attributes.values.parent.attribute']));
     }
 
     public function destroy(Product $product)
@@ -460,32 +467,32 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        return response()->json(Product::where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
+        return response()->json(Product::where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
     public function weddingSpecials()
     {
-        return response()->json(Product::where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
+        return response()->json(Product::where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
     public function bestsellers()
     {
-        return response()->json(Product::where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
+        return response()->json(Product::where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
     public function heroFeatured()
     {
-        return response()->json(Product::where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
+        return response()->json(Product::where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
     public function festiveSpecials()
     {
-        return response()->json(Product::where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values', 'reviews'])->get());
+        return response()->json(Product::where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
     public function show($id)
     {
-        $product = Product::with(['category', 'categories', 'attributes.values', 'reviews'])->find($id);
+        $product = Product::with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])->find($id);
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
@@ -494,11 +501,11 @@ class ProductController extends Controller
 
     public function showBySlug($slug)
     {
-        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values', 'reviews'])->first();
+        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])->first();
         if (!$product) {
             $product = Product::where('slug', $slug)
                 ->orWhere('title', 'LIKE', '%' . str_replace('-', ' ', $slug) . '%')
-                ->with(['category', 'categories', 'attributes.values', 'reviews'])
+                ->with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])
                 ->first();
         }
 
