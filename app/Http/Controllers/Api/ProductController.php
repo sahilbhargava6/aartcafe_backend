@@ -322,16 +322,38 @@ class ProductController extends Controller
         }
 
         if ($request->has('attributes')) {
+            $createdValuesMap = [];
+
+            // Pass 1: Create attributes and values
             foreach ($request->input('attributes') as $attrData) {
                 $attribute = $product->attributes()->create([
                     'name' => $attrData['name'],
                     'type' => $attrData['type'] ?? 'checkbox'
                 ]);
                 foreach ($attrData['values'] as $valData) {
-                    $attribute->values()->create([
+                    $valueModel = $attribute->values()->create([
                         'value' => $valData['value'],
                         'price_modifier' => $valData['price_modifier'] ?? 0.00
                     ]);
+                    $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] = $valueModel;
+                }
+            }
+
+            // Pass 2: Link parent dependencies
+            foreach ($request->input('attributes') as $attrData) {
+                foreach ($attrData['values'] as $valData) {
+                    if (!empty($valData['parent_attribute_name']) && !empty($valData['parent_value_name'])) {
+                        $parentAttrKey = strtolower($valData['parent_attribute_name']);
+                        $parentValKey = strtolower($valData['parent_value_name']);
+                        
+                        if (isset($createdValuesMap[$parentAttrKey][$parentValKey])) {
+                            $childModel = $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] ?? null;
+                            if ($childModel) {
+                                $childModel->parent_id = $createdValuesMap[$parentAttrKey][$parentValKey]->id;
+                                $childModel->save();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -389,17 +411,39 @@ class ProductController extends Controller
 
         if ($request->has('attributes')) {
             $product->attributes()->delete();
+            
+            $createdValuesMap = [];
 
+            // Pass 1: Create attributes and values
             foreach ($request->input('attributes') as $attrData) {
                 $attribute = $product->attributes()->create([
                     'name' => $attrData['name'],
                     'type' => $attrData['type'] ?? 'checkbox'
                 ]);
                 foreach ($attrData['values'] as $valData) {
-                    $attribute->values()->create([
+                    $valueModel = $attribute->values()->create([
                         'value' => $valData['value'],
                         'price_modifier' => $valData['price_modifier'] ?? 0.00
                     ]);
+                    $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] = $valueModel;
+                }
+            }
+
+            // Pass 2: Link parent dependencies
+            foreach ($request->input('attributes') as $attrData) {
+                foreach ($attrData['values'] as $valData) {
+                    if (!empty($valData['parent_attribute_name']) && !empty($valData['parent_value_name'])) {
+                        $parentAttrKey = strtolower($valData['parent_attribute_name']);
+                        $parentValKey = strtolower($valData['parent_value_name']);
+                        
+                        if (isset($createdValuesMap[$parentAttrKey][$parentValKey])) {
+                            $childModel = $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] ?? null;
+                            if ($childModel) {
+                                $childModel->parent_id = $createdValuesMap[$parentAttrKey][$parentValKey]->id;
+                                $childModel->save();
+                            }
+                        }
+                    }
                 }
             }
         }
