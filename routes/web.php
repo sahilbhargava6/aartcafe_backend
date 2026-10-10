@@ -22,12 +22,30 @@ Route::get('/test-db-products', function () {
 
 
 // Serve uploaded images directly from the default disk (Bucket)
-// Serve uploaded images directly from the default disk (Bucket)
 Route::get('/storage/{path}', function ($path) {
-    if (!Storage::exists($path)) {
-        abort(404);
+    try {
+        $exists = Storage::disk('s3')->exists($path);
+        if (!$exists) {
+            // Also check 'public' disk just in case
+            if (Storage::disk('public')->exists($path)) {
+                return Storage::disk('public')->response($path);
+            }
+            
+            // Debug info
+            return response()->json([
+                'error' => 'File not found',
+                'path' => $path,
+                's3_disk_config' => config('filesystems.disks.s3'),
+                'default_disk' => config('filesystems.default')
+            ], 404);
+        }
+        return Storage::disk('s3')->response($path);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'path' => $path
+        ], 500);
     }
-    return Storage::response($path);
 })->where('path', '.*');
 
 Route::get('/fix-urls', function () {
