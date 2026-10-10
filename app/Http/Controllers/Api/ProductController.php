@@ -237,10 +237,6 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
-            // Emergency clear base64 to fix OOM
-            \Illuminate\Support\Facades\DB::table('products')->where('image', 'LIKE', 'data:image%')->update(['image' => null]);
-            \Illuminate\Support\Facades\DB::table('products')->update(['images' => '[]']);
-            
             // Optimized column selection & lightweight eager loading to prevent OOM
             $query = Product::select([
                 'id',

@@ -57,14 +57,16 @@ Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $r
     if ($request->has('image')) {
         $img = $request->input('image');
         if (str_starts_with($img, 'data:image')) {
-            $product->image = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+            $url = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+            if ($url) $product->image = $url;
         }
     }
     if ($request->has('images') && is_array($request->input('images'))) {
         $newImages = [];
         foreach ($request->input('images') as $img) {
             if (str_starts_with($img, 'data:image')) {
-                $newImages[] = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+                $url = (new \App\Http\Controllers\Api\ProductController)->saveBase64Image($img);
+                if ($url) $newImages[] = $url;
             } else {
                 $newImages[] = $img;
             }
@@ -75,7 +77,7 @@ Route::post('/sync-local-images/{product}', function(\Illuminate\Http\Request $r
     $product->unsetRelation('categories');
     $product->unsetRelation('attributes');
     $product->save();
-    return response()->json(['status' => 'success', 'product_id' => $product->id]);
+    return response()->json(['status' => 'success', 'product_id' => $product->id, 'image' => $product->image]);
 });
 
 Route::get('/debug', function () {
