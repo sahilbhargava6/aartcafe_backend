@@ -101,7 +101,7 @@ class OrderController extends Controller
         $image = (string) ($product->image ?: ($product->images[0] ?? ''));
         // "Contact for details" on a festive Hidden item: no price shown, the shop quotes it
         // over WhatsApp. Only honoured for products the admin actually set to Hidden.
-        $priceOnRequest = $product->festive_status === 'hidden' && !empty($item['price_on_request']);
+        $priceOnRequest = $product->is_festive_hidden && !empty($item['price_on_request']);
 
         return [
             'product_id'       => $product->id,

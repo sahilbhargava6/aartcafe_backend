@@ -161,7 +161,9 @@ class ProductController extends Controller
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
             'is_festive_special' => 'nullable|boolean',
-            'festive_status' => 'nullable|in:featured,selected,hidden',
+            'is_festive_featured' => 'nullable|boolean',
+            'is_festive_selected' => 'nullable|boolean',
+            'is_festive_hidden' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
@@ -259,7 +261,9 @@ class ProductController extends Controller
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
             'is_festive_special' => 'nullable|boolean',
-            'festive_status' => 'nullable|in:featured,selected,hidden',
+            'is_festive_featured' => 'nullable|boolean',
+            'is_festive_selected' => 'nullable|boolean',
+            'is_festive_hidden' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
@@ -358,16 +362,19 @@ class ProductController extends Controller
     }
 
     /**
-     * ?status=featured → homepage Festive Treasures; ?status=hidden → off-festival items;
-     * no status → everything on the Festive Specials page (featured + selected).
+     * ?status=featured → homepage Festive Treasures; ?status=hidden → off-festival items
+     * (price on request); no status → products Selected for the Festive Specials page.
      */
     public function festiveSpecials(Request $request)
     {
-        $status = $request->query('status');
-        $statuses = in_array($status, Product::FESTIVE_STATUSES, true) ? [$status] : ['featured', 'selected'];
+        $flag = match ($request->query('status')) {
+            'featured' => 'is_festive_featured',
+            'hidden' => 'is_festive_hidden',
+            default => 'is_festive_selected',
+        };
 
         return response()->json(
-            Product::whereIn('festive_status', $statuses)
+            Product::where($flag, true)
                 ->where('is_active', true)
                 ->with(['category', 'attributes.values.parent.attribute', 'reviews'])
                 ->get()

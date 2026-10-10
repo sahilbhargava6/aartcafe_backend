@@ -21,25 +21,32 @@ class Product extends Model
         'is_hero_featured',
         'is_free_delivery',
         'is_festive_special',
-        'festive_status',
+        'is_festive_featured',
+        'is_festive_selected',
+        'is_festive_hidden',
         'is_active'
     ];
 
-    public const FESTIVE_STATUSES = ['featured', 'selected', 'hidden'];
-
     protected static function booted(): void
     {
-        // Keep the older is_festive_special flag (still used by the product form)
-        // in sync with festive_status, whichever one was changed.
         static::saving(function (Product $product) {
-            if ($product->isDirty('festive_status')) {
-                $product->is_festive_special = in_array($product->festive_status, ['featured', 'selected'], true);
+            if ($product->isDirty(['is_festive_featured', 'is_festive_selected', 'is_festive_hidden'])) {
+                // Featured and Selected combine freely; Hidden (price on request) excludes both
+                if ($product->isDirty('is_festive_hidden') && $product->is_festive_hidden) {
+                    $product->is_festive_featured = false;
+                    $product->is_festive_selected = false;
+                } elseif ($product->is_festive_featured || $product->is_festive_selected) {
+                    $product->is_festive_hidden = false;
+                }
+                $product->is_festive_special = $product->is_festive_featured || $product->is_festive_selected;
             } elseif ($product->isDirty('is_festive_special')) {
-                $onFestivePage = in_array($product->festive_status, ['featured', 'selected'], true);
-                if ($product->is_festive_special && !$onFestivePage) {
-                    $product->festive_status = 'selected';
-                } elseif (!$product->is_festive_special && $onFestivePage) {
-                    $product->festive_status = null;
+                // The product form only has the older single "festive" checkbox
+                if ($product->is_festive_special && !$product->is_festive_featured && !$product->is_festive_selected) {
+                    $product->is_festive_selected = true;
+                    $product->is_festive_hidden = false;
+                } elseif (!$product->is_festive_special) {
+                    $product->is_festive_featured = false;
+                    $product->is_festive_selected = false;
                 }
             }
         });
@@ -53,6 +60,9 @@ class Product extends Model
         'is_hero_featured' => 'boolean',
         'is_free_delivery' => 'boolean',
         'is_festive_special' => 'boolean',
+        'is_festive_featured' => 'boolean',
+        'is_festive_selected' => 'boolean',
+        'is_festive_hidden' => 'boolean',
         'is_active' => 'boolean',
         'base_price' => 'decimal:2',
         'discount_price' => 'decimal:2'
