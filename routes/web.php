@@ -28,16 +28,11 @@ Route::get('/media/{path}', function ($path) {
             if (Storage::disk('public')->exists($path)) {
                 return Storage::disk('public')->response($path);
             }
-            return response()->json(['error' => 'File not found on s3 or public', 'path' => $path], 404);
+            abort(404);
         }
         return Storage::disk('s3')->response($path);
     } catch (\Throwable $e) {
-        return response()->json([
-            'error' => 'Exception in media proxy',
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ], 500);
+        abort(404);
     }
 })->where('path', '.*');
 
