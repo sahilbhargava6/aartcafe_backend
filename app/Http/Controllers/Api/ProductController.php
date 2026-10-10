@@ -95,14 +95,9 @@ class ProductController extends Controller
 
             $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
 
-            try {
-                // Force save to the s3 disk (Cloudflare R2 Bucket)
-                Storage::disk('s3')->put($fileName, $finalData, 'public');
-                return env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud') . '/media/' . $fileName;
-            } catch (\Throwable $e) {
-                \Log::error('Upload Failed: ' . $e->getMessage());
-                return null;
-            }
+            // Force save to the s3 disk (Cloudflare R2 Bucket)
+            Storage::disk('s3')->put($fileName, $finalData, 'public');
+            return env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud') . '/media/' . $fileName;
         }
 
         return $base64String;
