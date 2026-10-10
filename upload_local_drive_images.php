@@ -17,6 +17,12 @@ if (!is_dir($extractedDir)) {
 $folders = array_diff(scandir($extractedDir), ['.', '..']);
 $baseUrl = 'https://aartcafe-backend-production-rjudvs.laravel.cloud';
 
+// sync-local-images requires an admin token (get one via POST /api/login)
+$adminToken = getenv('AARTCAFE_ADMIN_TOKEN');
+if (!$adminToken) {
+    die("Set AARTCAFE_ADMIN_TOKEN to an admin API token first\n");
+}
+
 // Fetch production products via API
 $json = file_get_contents($baseUrl . '/api/products');
 $products = json_decode($json, true) ?? [];
@@ -85,7 +91,8 @@ foreach ($folders as $folderName) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($updateData));
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Content-Type: application/json',
-                'Accept: application/json'
+                'Accept: application/json',
+                'Authorization: Bearer ' . $adminToken
             ]);
             $res = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

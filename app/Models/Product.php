@@ -21,8 +21,29 @@ class Product extends Model
         'is_hero_featured',
         'is_free_delivery',
         'is_festive_special',
+        'festive_status',
         'is_active'
     ];
+
+    public const FESTIVE_STATUSES = ['featured', 'selected', 'hidden'];
+
+    protected static function booted(): void
+    {
+        // Keep the older is_festive_special flag (still used by the product form)
+        // in sync with festive_status, whichever one was changed.
+        static::saving(function (Product $product) {
+            if ($product->isDirty('festive_status')) {
+                $product->is_festive_special = in_array($product->festive_status, ['featured', 'selected'], true);
+            } elseif ($product->isDirty('is_festive_special')) {
+                $onFestivePage = in_array($product->festive_status, ['featured', 'selected'], true);
+                if ($product->is_festive_special && !$onFestivePage) {
+                    $product->festive_status = 'selected';
+                } elseif (!$product->is_festive_special && $onFestivePage) {
+                    $product->festive_status = null;
+                }
+            }
+        });
+    }
 
     protected $casts = [
         'images' => 'array',

@@ -12,6 +12,30 @@ use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
+    /**
+     * Save image bytes to the default disk (the Laravel Cloud bucket in production)
+     * and return the /media URL that serves it. Throws if the write fails, so a
+     * product is never saved pointing at a file that doesn't exist.
+     */
+    private function storeImage(string $data, string $pathPrefix = 'products/', string $extension = 'webp'): string
+    {
+        $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
+        $mediaUrl = rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/') . '/media/' . $fileName;
+
+        // No 'public' visibility: the Cloud bucket is private and files are served through /media
+        if (Storage::disk(config('filesystems.default'))->put($fileName, $data)) {
+            return $mediaUrl;
+        }
+
+        // Only a dev machine without bucket credentials may use the local disk;
+        // on Laravel Cloud that disk is wiped on every deploy.
+        if (app()->environment('local') && Storage::disk('public')->put($fileName, $data)) {
+            return $mediaUrl;
+        }
+
+        throw new \RuntimeException("Could not save image {$fileName} to the storage bucket.");
+    }
+
     public function saveBase64Image($base64String, $pathPrefix = 'products/')
     {
         if (empty($base64String)) {
@@ -44,12 +68,11 @@ class ProductController extends Controller
                                 imagedestroy($img);
                             }
                         }
-                        $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
-                        Storage::disk('s3')->put($fileName, $finalData, 'public');
-                        $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
-                        return rtrim($baseUrl, '/') . '/media/' . $fileName;
+                        return $this->storeImage($finalData, $pathPrefix, $extension);
                     }
-                } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
         }
 
@@ -93,172 +116,18 @@ class ProductController extends Controller
                 }
             }
 
-            $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
-
-            // Attempt to save to S3 (R2 on Laravel Cloud) for permanent storage
-            try {
-                Storage::disk('s3')->put($fileName, $finalData, 'public');
-                $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
-                return rtrim($baseUrl, '/') . '/media/' . $fileName;
-            } catch (\Throwable $e) {
-                // Fallback for local development
-                Storage::disk('public')->put($fileName, $finalData);
-                return Storage::disk('public')->url($fileName);
-            }
+            return $this->storeImage($finalData, $pathPrefix, $extension);
         }
 
         return $base64String;
     }
 
-    public function convertAllImagesToWebp()
-    {
-        try {
-            // Find next product containing base64 images
-            $product = Product::where('image', 'LIKE', 'data:image%')
-                ->orWhere('images', 'LIKE', '%data:image%')
-                ->first();
-
-            $remainingCount = Product::where('image', 'LIKE', 'data:image%')
-                ->orWhere('images', 'LIKE', '%data:image%')
-                ->count();
-
-            if (!$product) {
-                return response()->json([
-                    'status' => 'completed',
-                    'message' => 'All product images have been converted to WebP files!',
-                    'remaining' => 0
-                ]);
-            }
-
-            $changed = false;
-            if ($product->image && str_starts_with($product->image, 'data:image')) {
-                $product->image = $this->saveBase64Image($product->image);
-                $changed = true;
-            }
-
-            $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
-            if (is_array($imagesData)) {
-                $newImages = [];
-                foreach ($imagesData as $img) {
-                    if ($img && str_starts_with($img, 'data:image')) {
-                        $newImages[] = $this->saveBase64Image($img);
-                        $changed = true;
-                    } else {
-                        $newImages[] = $img;
-                    }
-                }
-                $product->images = $newImages;
-            }
-
-            if ($changed) {
-                $product->unsetRelation('category');
-                $product->unsetRelation('categories');
-                $product->unsetRelation('attributes');
-                $product->save();
-            }
-
-            return response()->json([
-                'status' => 'in_progress',
-                'message' => "Successfully converted product ID {$product->id} ('{$product->title}') to WebP.",
-                'remaining' => max(0, $remainingCount - 1),
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    public function fixBrokenR2Urls()
-    {
-        try {
-            $products = Product::all();
-            $fixedCount = 0;
-            $baseUrl = rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/');
-
-            // Also ensure storage link exists
-            try {
-                \Illuminate\Support\Facades\Artisan::call('storage:link');
-            } catch (\Throwable $e) {}
-
-            foreach ($products as $product) {
-                $changed = false;
-
-                // Fix single main image
-                if (!empty($product->image) && !str_starts_with($product->image, 'data:image')) {
-                    $img = $product->image;
-                    $filename = basename(parse_url($img, PHP_URL_PATH));
-                    if (!empty($filename)) {
-                        $newUrl = $baseUrl . '/storage/products/' . $filename;
-                        if ($product->image !== $newUrl) {
-                            $product->image = $newUrl;
-                            $changed = true;
-                        }
-                    }
-                }
-
-                // Fix gallery sub-images array
-                $imagesData = is_string($product->images) ? json_decode($product->images, true) : $product->images;
-                if (is_array($imagesData)) {
-                    $newImages = [];
-                    foreach ($imagesData as $img) {
-                        if (!empty($img) && !str_starts_with($img, 'data:image')) {
-                            $filename = basename(parse_url($img, PHP_URL_PATH));
-                            if (!empty($filename)) {
-                                $newImages[] = $baseUrl . '/storage/products/' . $filename;
-                                $changed = true;
-                            } else {
-                                $newImages[] = $img;
-                            }
-                        } else {
-                            $newImages[] = $img;
-                        }
-                    }
-                    if ($changed) {
-                        $product->images = $newImages;
-                    }
-                }
-
-                if ($changed) {
-                    $product->unsetRelation('category');
-                    $product->unsetRelation('categories');
-                    $product->unsetRelation('attributes');
-                    $product->save();
-                    $fixedCount++;
-                }
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => "Successfully repaired product image paths with /storage/products/ prefix for {$fixedCount} products.",
-                'fixed_count' => $fixedCount,
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
     public function index(Request $request)
     {
         try {
-            // Optimized column selection & lightweight eager loading to prevent OOM
-            $query = Product::select([
-                'id',
-                'category_id',
-                'title',
-                'slug',
-                'base_price',
-                'discount_price',
-                'description',
-                'image',
-                'images',
-                'is_new_discovery',
-                'is_wedding_special',
-                'is_bestseller',
-                'is_hero_featured',
-                'is_free_delivery',
-                'is_festive_special',
-                'is_active',
-                'created_at',
-            ])->with(['category:id,name', 'categories:id,name', 'attributes.values.parent.attribute']);
+            // All product columns: listing them by name would break this endpoint whenever
+            // a deploy goes live before its migration has added a new column
+            $query = Product::select('products.*')->with(['category:id,name', 'categories:id,name', 'attributes.values.parent.attribute']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
@@ -267,7 +136,8 @@ class ProductController extends Controller
             $products = $query->get();
             return response()->json($products);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()], 500);
+            report($e);
+            return response()->json(['error' => 'Failed to load products.'], 500);
         }
     }
 
@@ -291,6 +161,7 @@ class ProductController extends Controller
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
             'is_festive_special' => 'nullable|boolean',
+            'festive_status' => 'nullable|in:featured,selected,hidden',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
@@ -388,6 +259,7 @@ class ProductController extends Controller
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
             'is_festive_special' => 'nullable|boolean',
+            'festive_status' => 'nullable|in:featured,selected,hidden',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
@@ -485,9 +357,21 @@ class ProductController extends Controller
         return response()->json(Product::where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
     }
 
-    public function festiveSpecials()
+    /**
+     * ?status=featured → homepage Festive Treasures; ?status=hidden → off-festival items;
+     * no status → everything on the Festive Specials page (featured + selected).
+     */
+    public function festiveSpecials(Request $request)
     {
-        return response()->json(Product::where('is_festive_special', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
+        $status = $request->query('status');
+        $statuses = in_array($status, Product::FESTIVE_STATUSES, true) ? [$status] : ['featured', 'selected'];
+
+        return response()->json(
+            Product::whereIn('festive_status', $statuses)
+                ->where('is_active', true)
+                ->with(['category', 'attributes.values.parent.attribute', 'reviews'])
+                ->get()
+        );
     }
 
     public function show($id)
@@ -690,6 +574,7 @@ class ProductController extends Controller
                     'is_bestseller' => $isBestseller,
                     'is_hero_featured' => $isHeroFeatured,
                 ]);
+                $currentProduct->categories()->sync([$currentCat->id]);
 
                 $importedCount++;
             } elseif ($currentProduct && !empty($rowPrice) && $currentProduct->base_price == 0) {
@@ -836,11 +721,7 @@ class ProductController extends Controller
                             if ($compressed) $finalData = $compressed;
                             imagedestroy($img);
                         }
-                        $fileName = 'products/' . Str::random(24) . '.webp';
-                        Storage::disk('public')->put($fileName, $finalData);
-                        $baseUrl = env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud');
-                        
-                        $product->image = rtrim($baseUrl, '/') . '/storage/' . $fileName;
+                        $product->image = $this->storeImage($finalData);
                         $product->unsetRelation('category');
                         $product->unsetRelation('categories');
                         $product->unsetRelation('attributes');
@@ -879,11 +760,10 @@ class ProductController extends Controller
             foreach ($uploadedFiles as $file) {
                 if (!$file->isValid()) continue;
                 
-                // Use streaming upload to the default disk (which Laravel Cloud configures as your Bucket)
-                $path = $file->store('products');
-                if ($path) {
-                    $newUrls[] = \Illuminate\Support\Facades\Storage::url($path);
-                }
+                if (!str_starts_with((string) $file->getMimeType(), 'image/')) continue;
+
+                $extension = strtolower($file->guessExtension() ?: 'jpg');
+                $newUrls[] = $this->storeImage(file_get_contents($file->getRealPath()), 'products/', $extension);
             }
 
             if (!empty($newUrls)) {
