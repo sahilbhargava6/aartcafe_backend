@@ -28,6 +28,7 @@ class OrderController extends Controller
             'items.*.option_ids.*' => 'integer',
             'items.*.quantity'     => 'required|integer|min:1|max:100',
             'items.*.price_on_request' => 'nullable|boolean',
+            'items.*.image'        => 'nullable|string|max:1024',
         ]);
 
         // Prices, titles and the total are always computed here from the database;
@@ -68,7 +69,7 @@ class OrderController extends Controller
         }
 
         $product = $productId
-            ? Product::with('attributes.values')->where('is_active', true)->find($productId)
+            ? Product::with('attributes.values.links')->where('is_active', true)->find($productId)
             : null;
         if (!$product) {
             return 'Some items in your bag are no longer available. Please remove them and try again.';
@@ -84,21 +85,35 @@ class OrderController extends Controller
         }
 
         $chosen = [];
+        $chosenValues = [];
         $perAttribute = [];
         foreach (array_unique($item['option_ids'] ?? []) as $optionId) {
             if (!isset($optionsById[$optionId])) {
                 return "The options chosen for \"{$product->title}\" have changed. Please remove it and add it to your bag again.";
             }
             [$attribute, $value] = $optionsById[$optionId];
-            $perAttribute[$attribute->id] = ($perAttribute[$attribute->id] ?? 0) + 1;
-            if ($attribute->type !== 'checkbox' && $perAttribute[$attribute->id] > 1) {
+            $perAttribute[$attribute->id][] = $value->id;
+            if ($attribute->type !== 'checkbox' && count($perAttribute[$attribute->id]) > 1) {
                 return "Only one \"{$attribute->name}\" can be chosen for \"{$product->title}\".";
             }
             $unitPrice += (float) $value->price_modifier;
             $chosen[] = $value->value;
+            $chosenValues[] = $value;
         }
 
-        $image = (string) ($product->image ?: ($product->images[0] ?? ''));
+        // An option linked to options of another attribute ("available only with") can't be
+        // combined with anything else chosen in that attribute
+        foreach ($chosenValues as $value) {
+            foreach ($value->links->groupBy('product_attribute_id') as $attributeId => $linked) {
+                if (array_diff($perAttribute[$attributeId] ?? [], $linked->pluck('id')->all())) {
+                    return "This combination of options isn't available for \"{$product->title}\". Please remove it and choose again.";
+                }
+            }
+        }
+
+        // The photo the customer had selected, if it is one of this product's photos
+        $photos = array_values(array_filter(array_merge([$product->image], is_array($product->images) ? $product->images : [])));
+        $image = in_array($item['image'] ?? null, $photos, true) ? $item['image'] : (string) ($photos[0] ?? '');
         // "Contact for details" on a festive Hidden item: no price shown, the shop quotes it
         // over WhatsApp. Only honoured for products the admin actually set to Hidden.
         $priceOnRequest = $product->is_festive_hidden && !empty($item['price_on_request']);

@@ -127,7 +127,7 @@ class ProductController extends Controller
         try {
             // All product columns: listing them by name would break this endpoint whenever
             // a deploy goes live before its migration has added a new column
-            $query = Product::select('products.*')->with(['category:id,name', 'categories:id,name', 'attributes.values.parent.attribute']);
+            $query = Product::select('products.*')->with(['category:id,name', 'categories:id,name', 'attributes.values.links.attribute']);
             
             if (!$request->has('all')) {
                 $query->where('is_active', true);
@@ -167,9 +167,14 @@ class ProductController extends Controller
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
+            'attributes.*.type' => 'nullable|string|in:select,checkbox,text,dropdown',
             'attributes.*.values' => 'nullable|array',
             'attributes.*.values.*.value' => 'nullable|string|max:255',
-            'attributes.*.values.*.price_modifier' => 'nullable|numeric'
+            'attributes.*.values.*.price_modifier' => 'nullable|numeric',
+            'attributes.*.values.*.image' => 'nullable|string|max:1024',
+            'attributes.*.values.*.links' => 'nullable|array',
+            'attributes.*.values.*.links.*.attribute' => 'nullable|string|max:255',
+            'attributes.*.values.*.links.*.value' => 'nullable|string|max:255',
         ]);
 
         if (empty($validated['slug'])) {
@@ -202,43 +207,10 @@ class ProductController extends Controller
         }
 
         if ($request->has('attributes')) {
-            $createdValuesMap = [];
-
-            // Pass 1: Create attributes and values
-            foreach ($request->input('attributes') as $attrData) {
-                $attribute = $product->attributes()->create([
-                    'name' => $attrData['name'],
-                    'type' => $attrData['type'] ?? 'checkbox'
-                ]);
-                foreach ($attrData['values'] as $valData) {
-                    $valueModel = $attribute->values()->create([
-                        'value' => $valData['value'],
-                        'price_modifier' => $valData['price_modifier'] ?? 0.00
-                    ]);
-                    $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] = $valueModel;
-                }
-            }
-
-            // Pass 2: Link parent dependencies
-            foreach ($request->input('attributes') as $attrData) {
-                foreach ($attrData['values'] as $valData) {
-                    if (!empty($valData['parent_attribute_name']) && !empty($valData['parent_value_name'])) {
-                        $parentAttrKey = strtolower($valData['parent_attribute_name']);
-                        $parentValKey = strtolower($valData['parent_value_name']);
-                        
-                        if (isset($createdValuesMap[$parentAttrKey][$parentValKey])) {
-                            $childModel = $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] ?? null;
-                            if ($childModel) {
-                                $childModel->parent_id = $createdValuesMap[$parentAttrKey][$parentValKey]->id;
-                                $childModel->save();
-                            }
-                        }
-                    }
-                }
-            }
+            $this->saveAttributes($product, $request->input('attributes') ?? []);
         }
 
-        return response()->json($product->load(['category', 'categories', 'attributes.values.parent.attribute']), 201);
+        return response()->json($product->load(['category', 'categories', 'attributes.values.links.attribute']), 201);
     }
 
     public function update(Request $request, Product $product)
@@ -267,9 +239,14 @@ class ProductController extends Controller
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
+            'attributes.*.type' => 'nullable|string|in:select,checkbox,text,dropdown',
             'attributes.*.values' => 'nullable|array',
             'attributes.*.values.*.value' => 'nullable|string|max:255',
-            'attributes.*.values.*.price_modifier' => 'nullable|numeric'
+            'attributes.*.values.*.price_modifier' => 'nullable|numeric',
+            'attributes.*.values.*.image' => 'nullable|string|max:1024',
+            'attributes.*.values.*.links' => 'nullable|array',
+            'attributes.*.values.*.links.*.attribute' => 'nullable|string|max:255',
+            'attributes.*.values.*.links.*.value' => 'nullable|string|max:255',
         ]);
 
         $categoryIds = $request->input('category_ids', null);
@@ -294,44 +271,65 @@ class ProductController extends Controller
 
         if ($request->has('attributes')) {
             $product->attributes()->delete();
-            
-            $createdValuesMap = [];
+            $this->saveAttributes($product, $request->input('attributes') ?? []);
+        }
 
-            // Pass 1: Create attributes and values
-            foreach ($request->input('attributes') as $attrData) {
-                $attribute = $product->attributes()->create([
-                    'name' => $attrData['name'],
-                    'type' => $attrData['type'] ?? 'checkbox'
+        return response()->json($product->load(['category', 'attributes.values.links.attribute']));
+    }
+
+    /**
+     * Create a product's attributes from the dashboard payload. Each value may carry one of the
+     * product's photos and "available only with" links to values of other attributes. Links are
+     * given by name ({attribute, value}) because every value gets a new id on each save.
+     */
+    private function saveAttributes(Product $product, array $attributes): void
+    {
+        $key = fn ($text) => mb_strtolower(trim((string) $text));
+        $created = [];
+        $pendingLinks = [];
+
+        foreach ($attributes as $attrData) {
+            if ($key($attrData['name'] ?? '') === '') continue;
+            $attribute = $product->attributes()->create([
+                'name' => $attrData['name'],
+                'type' => $attrData['type'] ?? 'checkbox'
+            ]);
+            foreach ($attrData['values'] ?? [] as $valData) {
+                if ($key($valData['value'] ?? '') === '') continue;
+                $value = $attribute->values()->create([
+                    'value' => $valData['value'],
+                    'price_modifier' => $valData['price_modifier'] ?? 0.00,
+                    'image' => $this->productPhoto($product, $valData['image'] ?? null),
                 ]);
-                foreach ($attrData['values'] as $valData) {
-                    $valueModel = $attribute->values()->create([
-                        'value' => $valData['value'],
-                        'price_modifier' => $valData['price_modifier'] ?? 0.00
-                    ]);
-                    $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] = $valueModel;
-                }
-            }
+                $created[$key($attrData['name'])][$key($valData['value'])] = $value;
 
-            // Pass 2: Link parent dependencies
-            foreach ($request->input('attributes') as $attrData) {
-                foreach ($attrData['values'] as $valData) {
-                    if (!empty($valData['parent_attribute_name']) && !empty($valData['parent_value_name'])) {
-                        $parentAttrKey = strtolower($valData['parent_attribute_name']);
-                        $parentValKey = strtolower($valData['parent_value_name']);
-                        
-                        if (isset($createdValuesMap[$parentAttrKey][$parentValKey])) {
-                            $childModel = $createdValuesMap[strtolower($attrData['name'])][strtolower($valData['value'])] ?? null;
-                            if ($childModel) {
-                                $childModel->parent_id = $createdValuesMap[$parentAttrKey][$parentValKey]->id;
-                                $childModel->save();
-                            }
-                        }
-                    }
+                $links = $valData['links'] ?? [];
+                // Dashboards from before value links send a single "depends on" parent instead
+                if (!empty($valData['parent_attribute_name']) && !empty($valData['parent_value_name'])) {
+                    $links[] = ['attribute' => $valData['parent_attribute_name'], 'value' => $valData['parent_value_name']];
                 }
+                if ($links) $pendingLinks[] = [$value, $key($attrData['name']), $links];
             }
         }
 
-        return response()->json($product->load(['category', 'attributes.values.parent.attribute']));
+        foreach ($pendingLinks as [$value, $ownAttribute, $links]) {
+            $ids = [];
+            foreach ($links as $link) {
+                $linkedAttribute = $key($link['attribute'] ?? '');
+                $linked = $created[$linkedAttribute][$key($link['value'] ?? '')] ?? null;
+                // A value can only be linked to options of the other attributes
+                if ($linked && $linkedAttribute !== $ownAttribute) $ids[] = $linked->id;
+            }
+            if ($ids) $value->links()->sync(array_values(array_unique($ids)));
+        }
+    }
+
+    // An option's photo must be one of the product's own photos
+    private function productPhoto(Product $product, ?string $url): ?string
+    {
+        if (!$url) return null;
+        $photos = array_merge([$product->image], is_array($product->images) ? $product->images : []);
+        return in_array($url, $photos, true) ? $url : null;
     }
 
     public function destroy(Product $product)
@@ -343,22 +341,22 @@ class ProductController extends Controller
 
     public function newDiscoveries()
     {
-        return response()->json(Product::where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
+        return response()->json(Product::where('is_new_discovery', true)->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
     }
 
     public function weddingSpecials()
     {
-        return response()->json(Product::where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
+        return response()->json(Product::where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
     }
 
     public function bestsellers()
     {
-        return response()->json(Product::where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
+        return response()->json(Product::where('is_bestseller', true)->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
     }
 
     public function heroFeatured()
     {
-        return response()->json(Product::where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values.parent.attribute', 'reviews'])->get());
+        return response()->json(Product::where('is_hero_featured', true)->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
     }
 
     /**
@@ -376,14 +374,14 @@ class ProductController extends Controller
         return response()->json(
             Product::where($flag, true)
                 ->where('is_active', true)
-                ->with(['category', 'attributes.values.parent.attribute', 'reviews'])
+                ->with(['category', 'attributes.values.links.attribute', 'reviews'])
                 ->get()
         );
     }
 
     public function show($id)
     {
-        $product = Product::with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])->find($id);
+        $product = Product::with(['category', 'categories', 'attributes.values.links.attribute', 'reviews'])->find($id);
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
@@ -392,11 +390,11 @@ class ProductController extends Controller
 
     public function showBySlug($slug)
     {
-        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])->first();
+        $product = Product::where('slug', $slug)->with(['category', 'categories', 'attributes.values.links.attribute', 'reviews'])->first();
         if (!$product) {
             $product = Product::where('slug', $slug)
                 ->orWhere('title', 'LIKE', '%' . str_replace('-', ' ', $slug) . '%')
-                ->with(['category', 'categories', 'attributes.values.parent.attribute', 'reviews'])
+                ->with(['category', 'categories', 'attributes.values.links.attribute', 'reviews'])
                 ->first();
         }
 
