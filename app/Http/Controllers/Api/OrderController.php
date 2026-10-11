@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Support\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -31,6 +32,7 @@ class OrderController extends Controller
             // Only used when it is one of the product's photos, so it is never rejected (some
             // product photos are long data: URLs)
             'items.*.image'        => 'nullable|string',
+            'reference_image'      => 'nullable|string|max:1024',
         ]);
 
         // Prices, titles and the total are always computed here from the database;
@@ -46,16 +48,40 @@ class OrderController extends Controller
             $total += $line['price'] * $line['quantity'];
         }
 
+        // Only a photo uploaded through uploadReference() can be attached
+        $reference = $validated['reference_image'] ?? null;
+        if ($reference && !str_starts_with($reference, MediaStorage::url('references/'))) {
+            $reference = null;
+        }
+
         $order = Order::create([
-            'customer_name'  => $validated['customer_name'],
-            'customer_email' => $validated['customer_email'] ?? null,
-            'customer_phone' => $validated['customer_phone'],
-            'total_amount'   => round($total, 2),
-            'items'          => $items,
-            'status'         => 'pending',
+            'customer_name'   => $validated['customer_name'],
+            'customer_email'  => $validated['customer_email'] ?? null,
+            'customer_phone'  => $validated['customer_phone'],
+            'total_amount'    => round($total, 2),
+            'items'           => $items,
+            'reference_image' => $reference,
+            'status'          => 'pending',
         ]);
 
         return response()->json(['message' => 'Order created successfully', 'order' => $order], 201);
+    }
+
+    /**
+     * A reference photo a customer attaches in the bag (public, rate-limited). It is stored as
+     * WebP, which also drops anything in the file that isn't image data, and the returned link
+     * goes in the order and its WhatsApp message.
+     */
+    public function uploadReference(Request $request)
+    {
+        $request->validate(['image' => 'required|file|image|max:15360']);
+
+        $webp = MediaStorage::webpFromUpload($request->file('image')->getRealPath());
+        if ($webp === null) {
+            throw ValidationException::withMessages(['image' => 'That file could not be read as a photo.']);
+        }
+
+        return response()->json(['url' => MediaStorage::store($webp, 'references/', 'webp')], 201);
     }
 
     /**

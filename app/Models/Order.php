@@ -15,6 +15,7 @@ class Order extends Model
         'customer_phone',
         'total_amount',
         'items',
+        'reference_image',
         'status',
     ];
 

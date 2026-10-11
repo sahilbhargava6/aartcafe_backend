@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Category;
+use App\Support\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -19,21 +19,7 @@ class ProductController extends Controller
      */
     private function storeImage(string $data, string $pathPrefix = 'products/', string $extension = 'webp'): string
     {
-        $fileName = $pathPrefix . Str::random(24) . '.' . $extension;
-        $mediaUrl = rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/') . '/media/' . $fileName;
-
-        // No 'public' visibility: the Cloud bucket is private and files are served through /media
-        if (Storage::disk(config('filesystems.default'))->put($fileName, $data)) {
-            return $mediaUrl;
-        }
-
-        // Only a dev machine without bucket credentials may use the local disk;
-        // on Laravel Cloud that disk is wiped on every deploy.
-        if (app()->environment('local') && Storage::disk('public')->put($fileName, $data)) {
-            return $mediaUrl;
-        }
-
-        throw new \RuntimeException("Could not save image {$fileName} to the storage bucket.");
+        return MediaStorage::store($data, $pathPrefix, $extension);
     }
 
     public function saveBase64Image($base64String, $pathPrefix = 'products/')

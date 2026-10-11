@@ -18,6 +18,9 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // ── Public Order Submission & Tracking ──
 Route::post('/orders', [OrderController::class, 'store']);
+// A customer's reference photo for their order; public, so rate-limited (per IP; mobile networks
+// share IPs between many customers, so the limit is generous)
+Route::post('/order-images', [OrderController::class, 'uploadReference'])->middleware('throttle:20,10');
 Route::get('/orders/track', [OrderController::class, 'track'])->middleware('throttle:10,1');
 
 // ── Public Reviews ──
