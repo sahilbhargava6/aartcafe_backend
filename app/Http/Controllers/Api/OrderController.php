@@ -28,7 +28,9 @@ class OrderController extends Controller
             'items.*.option_ids.*' => 'integer',
             'items.*.quantity'     => 'required|integer|min:1|max:100',
             'items.*.price_on_request' => 'nullable|boolean',
-            'items.*.image'        => 'nullable|string|max:1024',
+            // Only used when it is one of the product's photos, so it is never rejected (some
+            // product photos are long data: URLs)
+            'items.*.image'        => 'nullable|string',
         ]);
 
         // Prices, titles and the total are always computed here from the database;
