@@ -292,7 +292,7 @@ class ProductController extends Controller
             if ($key($attrData['name'] ?? '') === '') continue;
             $attribute = $product->attributes()->create([
                 'name' => $attrData['name'],
-                'type' => $attrData['type'] ?? 'checkbox'
+                'type' => $attrData['type'] ?? 'select'
             ]);
             foreach ($attrData['values'] ?? [] as $valData) {
                 if ($key($valData['value'] ?? '') === '') continue;
@@ -606,7 +606,11 @@ class ProductController extends Controller
                                 continue; // Skip NA or placeholder values
                             }
 
-                            $attribute = $currentProduct->attributes()->firstOrCreate(['name' => $attrName]);
+                            // Pill buttons (one choice), except the "Options" add-on lists where customers pick several
+                            $attribute = $currentProduct->attributes()->firstOrCreate(
+                                ['name' => $attrName],
+                                ['type' => $attrName === 'Options' ? 'checkbox' : 'select']
+                            );
 
                             // Parse inline price modifiers e.g. "With: ₹299" or "Without: ₹249" or "With: 499"
                             $priceMod = 0.00;
