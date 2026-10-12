@@ -12,7 +12,12 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        return response()->json(Category::with(['parent', 'children'])->withCount('products')->get());
+        $categories = Category::with('parents:id')->withCount('products')->get();
+        $categories->each(function (Category $category) {
+            $category->setAttribute('parent_ids', $category->parents->pluck('id')->values());
+            $category->unsetRelation('parents');
+        });
+        return response()->json($categories);
     }
 
     public function store(Request $request)
@@ -20,18 +25,22 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|unique:categories,slug',
-            'parent_id' => 'nullable|exists:categories,id'
+            'parent_id' => 'nullable|exists:categories,id',
+            'parent_ids' => 'sometimes|array',
+            'parent_ids.*' => 'integer|distinct|exists:categories,id',
         ]);
 
-        if ($error = $this->parentError($validated['parent_id'] ?? null)) {
-            return response()->json(['message' => $error], 422);
-        }
+        $parentIds = $this->requestedParents($request);
 
         if (empty($validated['slug'])) {
             $validated['slug'] = Str::slug($validated['name']);
         }
 
-        $category = Category::create($validated);
+        $category = DB::transaction(function () use ($validated, $parentIds) {
+            $category = Category::create(collect($validated)->except('parent_ids')->all());
+            $this->saveParents($category, $parentIds);
+            return $category;
+        });
         return response()->json($category, 201);
     }
 
@@ -45,34 +54,58 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'slug' => 'sometimes|required|string|unique:categories,slug,' . $category->id,
-            'parent_id' => 'nullable|exists:categories,id'
+            'parent_id' => 'nullable|exists:categories,id',
+            'parent_ids' => 'sometimes|array',
+            'parent_ids.*' => 'integer|distinct|exists:categories,id',
         ]);
 
-        if ($error = $this->parentError($validated['parent_id'] ?? null, $category)) {
+        $parentIds = $request->has('parent_ids') || $request->exists('parent_id') ? $this->requestedParents($request) : null;
+        if ($parentIds !== null && ($error = $this->parentError($parentIds, $category))) {
             return response()->json(['message' => $error], 422);
         }
 
-        $category->update($validated);
+        DB::transaction(function () use ($category, $validated, $parentIds) {
+            $category->update(collect($validated)->except(['parent_ids', 'parent_id'])->all());
+            if ($parentIds !== null) {
+                $this->saveParents($category, $parentIds);
+            }
+        });
         return response()->json($category);
     }
 
     /**
-     * Categories have two levels: a parent must be a main category, and a category that has
-     * sub-categories stays a main one (which also rules out loops). Returns the problem, if any.
+     * The parents sent from the dashboard: a parent_ids list, or the older single parent_id.
      */
-    private function parentError($parentId, ?Category $category = null): ?string
+    private function requestedParents(Request $request): array
     {
-        if (!$parentId) return null;
-        if ($category && (int) $parentId === $category->id) {
+        $ids = $request->has('parent_ids')
+            ? (array) $request->input('parent_ids')
+            : array_filter([$request->input('parent_id')]);
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * A category can sit under several parents, at any depth, as long as that never makes a loop:
+     * it cannot be its own parent, or sit under one of its own sub-categories. Returns the problem, if any.
+     */
+    private function parentError(array $parentIds, Category $category): ?string
+    {
+        if (in_array($category->id, $parentIds, true)) {
             return 'A category cannot be its own parent.';
         }
-        if (Category::whereKey($parentId)->whereNotNull('parent_id')->exists()) {
-            return 'Pick a main category as the parent. Sub-categories cannot have sub-categories of their own.';
-        }
-        if ($category && $category->children()->exists()) {
-            return 'This category has sub-categories, so it cannot become a sub-category itself.';
+        $loop = array_intersect($parentIds, $category->descendantIds());
+        if ($loop) {
+            $names = Category::whereKey($loop)->pluck('name')->implode(', ');
+            return "{$names} is inside {$category->name}, so it cannot also be its parent.";
         }
         return null;
+    }
+
+    /** Saves the parent links; parent_id keeps the first one for anything that still reads it. */
+    private function saveParents(Category $category, array $parentIds): void
+    {
+        $category->parents()->sync($parentIds);
+        $category->forceFill(['parent_id' => $parentIds[0] ?? null])->save();
     }
 
     /**
@@ -98,7 +131,15 @@ class CategoryController extends Controller
 
     public function destroy(Category $category)
     {
-        $category->delete();
+        DB::transaction(function () use ($category) {
+            // Its sub-categories keep their other parents (one with none left becomes a main category)
+            foreach ($category->children()->get() as $child) {
+                $child->forceFill([
+                    'parent_id' => $child->parents()->whereKeyNot($category->id)->value('categories.id'),
+                ])->save();
+            }
+            $category->delete();
+        });
         return response()->json(['message' => 'Category deleted successfully']);
     }
 }
