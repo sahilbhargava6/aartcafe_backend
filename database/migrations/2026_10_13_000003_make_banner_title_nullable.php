@@ -1,0 +1,25 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Banners can be image-only: the title is optional, like the subtitle already was.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('banners', function (Blueprint $table) {
+            $table->string('title')->nullable()->change();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('banners', function (Blueprint $table) {
+            $table->string('title')->nullable(false)->default('')->change();
+        });
+    }
+};

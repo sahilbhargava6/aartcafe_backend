@@ -47,7 +47,7 @@ class BannerController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'subtitle' => 'nullable|string|max:255',
             'image_url' => 'required|string',
             'button_text' => 'nullable|string',
@@ -78,7 +78,7 @@ class BannerController extends Controller
     public function update(Request $request, Banner $banner)
     {
         $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
+            'title' => 'sometimes|nullable|string|max:255',
             'subtitle' => 'nullable|string|max:255',
             'image_url' => 'sometimes|required|string',
             'button_text' => 'nullable|string',
