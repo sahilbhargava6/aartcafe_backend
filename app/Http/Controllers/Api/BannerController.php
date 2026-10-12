@@ -4,15 +4,39 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Banner;
+use App\Support\MediaStorage;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class BannerController extends Controller
 {
-    private function saveBase64Image($base64String, $pathPrefix = 'banners/')
+    /**
+     * An uploaded banner photo (a data: URL from the dashboard) is stored in the Cloud bucket as
+     * WebP and replaced by its /media link: the image_url column only holds 255 characters.
+     * Anything else (an existing link) is kept as it is.
+     */
+    private function saveBase64Image($image, $pathPrefix = 'banners/')
     {
-        // To avoid ephemeral storage issues on Laravel Cloud without S3,
-        // we just save the Base64 string directly to the database.
-        return $base64String;
+        if (!is_string($image) || !str_starts_with($image, 'data:image')) {
+            return $image;
+        }
+
+        $data = base64_decode(substr($image, strpos($image, ',') + 1), true);
+        $webp = null;
+        if ($data !== false) {
+            $tmp = tempnam(sys_get_temp_dir(), 'banner');
+            file_put_contents($tmp, $data);
+            try {
+                $webp = MediaStorage::webpFromUpload($tmp, 2000);
+            } finally {
+                @unlink($tmp);
+            }
+        }
+        if ($webp === null) {
+            throw ValidationException::withMessages(['image_url' => 'The banner image could not be read. Please try another image.']);
+        }
+
+        return MediaStorage::store($webp, $pathPrefix, 'webp');
     }
 
     public function index()
