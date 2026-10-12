@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -15,6 +16,33 @@ class MediaStorage
     public static function url(string $path = ''): string
     {
         return rtrim(env('APP_URL', 'https://aartcafe-backend-production-rjudvs.laravel.cloud'), '/') . '/media/' . $path;
+    }
+
+    /**
+     * The bytes of an image given by its public address: a /media file from our own disks,
+     * or anything else fetched over HTTP. Null when it can't be read.
+     */
+    public static function read(?string $url): ?string
+    {
+        if (!$url) return null;
+        $marker = '/media/';
+        if (($at = strpos($url, $marker)) !== false) {
+            $path = urldecode(substr($url, $at + strlen($marker)));
+            foreach (array_unique([config('filesystems.default'), 's3', 'public']) as $disk) {
+                try {
+                    if (Storage::disk($disk)->exists($path)) return Storage::disk($disk)->get($path);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+        if (!str_starts_with($url, 'http')) return null;
+        try {
+            $response = Http::timeout(10)->get($url);
+            return $response->successful() ? $response->body() : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     public static function store(string $data, string $pathPrefix = 'products/', string $extension = 'webp'): string

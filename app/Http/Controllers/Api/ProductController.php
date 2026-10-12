@@ -365,6 +365,32 @@ class ProductController extends Controller
         );
     }
 
+    /**
+     * The product's main photo as a 1200×630 JPEG for link previews (WhatsApp, Facebook, …),
+     * which don't all show WebP. The whole photo is fitted onto a soft pink card.
+     */
+    public function shareImage(Product $product)
+    {
+        $images = is_array($product->images) ? $product->images : [];
+        $data = MediaStorage::read($product->image ?: ($images[0] ?? null));
+        $photo = $data ? @imagecreatefromstring($data) : false;
+        if (!$photo) abort(404);
+
+        [$width, $height] = [1200, 630];
+        $card = imagecreatetruecolor($width, $height);
+        imagefill($card, 0, 0, imagecolorallocate($card, 251, 239, 241));
+        $scale = min($width / imagesx($photo), $height / imagesy($photo));
+        [$w, $h] = [(int) round(imagesx($photo) * $scale), (int) round(imagesy($photo) * $scale)];
+        imagecopyresampled($card, $photo, (int) (($width - $w) / 2), (int) (($height - $h) / 2), 0, 0, $w, $h, imagesx($photo), imagesy($photo));
+
+        ob_start();
+        imagejpeg($card, null, 85);
+        return response(ob_get_clean(), 200, [
+            'Content-Type' => 'image/jpeg',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     public function show($id)
     {
         $product = Product::with(['category', 'categories', 'attributes.values.links.attribute', 'reviews'])->find($id);

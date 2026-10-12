@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\PageController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\SubscriberController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\AuthController;
@@ -18,6 +19,8 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // ── Public Order Submission & Tracking ──
 Route::post('/orders', [OrderController::class, 'store']);
+// Footer "Stay Connected" sign-up
+Route::post('/subscribers', [SubscriberController::class, 'store'])->middleware('throttle:10,1');
 // A customer's reference photo for their order; public, so rate-limited (per IP; mobile networks
 // share IPs between many customers, so the limit is generous)
 Route::post('/order-images', [OrderController::class, 'uploadReference'])->middleware('throttle:20,10');
@@ -43,6 +46,8 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}', [CategoryController::class, 'show']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{product}', [ProductController::class, 'show']);
+// Product photo as a JPEG card for link previews when a product page is shared
+Route::get('/products/{product}/share-image', [ProductController::class, 'shareImage'])->middleware('throttle:120,1');
 Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/pages', [PageController::class, 'index']);
 
@@ -77,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/products/bulk-import', [ProductController::class, 'bulkImport']);
 
     // Categories Write/Edit
+    Route::put('/footer-categories', [CategoryController::class, 'updateFooter']);
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{category}', [CategoryController::class, 'update']);
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
@@ -89,6 +95,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pages/{page}', [PageController::class, 'update']);
     Route::delete('/pages/{page}', [PageController::class, 'destroy']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
+
+    // Footer "Stay Connected" sign-ups
+    Route::get('/subscribers', [SubscriberController::class, 'index']);
+    Route::delete('/subscribers/{subscriber}', [SubscriberController::class, 'destroy']);
 
     // Uploads & Image Maintenance
     Route::post('/upload', [UploadController::class, 'store']);

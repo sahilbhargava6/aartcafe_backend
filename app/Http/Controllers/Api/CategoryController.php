@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CategoryController extends Controller
@@ -72,6 +73,27 @@ class CategoryController extends Controller
             return 'This category has sub-categories, so it cannot become a sub-category itself.';
         }
         return null;
+    }
+
+    /**
+     * The footer's "Shop Collections" list: up to four categories or sub-categories, in order.
+     * An empty list clears it (the footer then shows the biggest categories).
+     */
+    public function updateFooter(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'present|array|max:4',
+            'ids.*' => 'integer|distinct|exists:categories,id',
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            Category::whereNotNull('footer_order')->update(['footer_order' => null]);
+            foreach (array_values($validated['ids']) as $position => $id) {
+                Category::whereKey($id)->update(['footer_order' => $position + 1]);
+            }
+        });
+
+        return response()->json(Category::whereNotNull('footer_order')->orderBy('footer_order')->get());
     }
 
     public function destroy(Category $category)
