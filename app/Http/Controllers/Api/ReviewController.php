@@ -16,15 +16,33 @@ class ReviewController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required_without:product_ids|nullable|exists:products,id',
+            'product_ids' => 'sometimes|array|min:1',
+            'product_ids.*' => 'integer|exists:products,id',
             'reviewer_name' => 'required|string|max:255',
             'review_text' => 'required|string',
             'rating' => 'required|integer|min:1|max:5',
             'is_approved' => 'nullable|boolean'
         ]);
 
-        $review = Review::create($validated);
-        return response()->json($review, 201);
+        $productIds = $request->has('product_ids')
+            ? array_values(array_unique(array_map('intval', (array) $request->input('product_ids'))))
+            : [intval($validated['product_id'])];
+
+        $reviews = [];
+        \Illuminate\Support\Facades\DB::transaction(function () use ($productIds, $validated, &$reviews) {
+            foreach ($productIds as $pId) {
+                $reviews[] = Review::create([
+                    'product_id' => $pId,
+                    'reviewer_name' => $validated['reviewer_name'],
+                    'review_text' => $validated['review_text'],
+                    'rating' => $validated['rating'],
+                    'is_approved' => $validated['is_approved'] ?? true,
+                ]);
+            }
+        });
+
+        return response()->json(count($reviews) === 1 ? $reviews[0] : $reviews, 201);
     }
 
     public function show(Review $review)

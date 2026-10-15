@@ -94,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pages', [PageController::class, 'store']);
     Route::put('/pages/{page}', [PageController::class, 'update']);
     Route::delete('/pages/{page}', [PageController::class, 'destroy']);
+    Route::put('/reviews/{review}', [ReviewController::class, 'update']);
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy']);
 
     // Footer "Stay Connected" sign-ups
