@@ -143,6 +143,8 @@ class ProductController extends Controller
             'images.*' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
+            'is_wedding_featured' => 'nullable|boolean',
+            'is_wedding_selected' => 'nullable|boolean',
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
@@ -215,6 +217,8 @@ class ProductController extends Controller
             'images.*' => 'nullable|string',
             'is_new_discovery' => 'nullable|boolean',
             'is_wedding_special' => 'nullable|boolean',
+            'is_wedding_featured' => 'nullable|boolean',
+            'is_wedding_selected' => 'nullable|boolean',
             'is_bestseller' => 'nullable|boolean',
             'is_hero_featured' => 'nullable|boolean',
             'is_free_delivery' => 'nullable|boolean',
@@ -332,7 +336,17 @@ class ProductController extends Controller
 
     public function weddingSpecials()
     {
-        return response()->json(Product::where('is_wedding_special', true)->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
+        return response()->json(Product::where(function($q) {
+            $q->where('is_wedding_special', true)
+              ->orWhere('is_wedding_featured', true);
+        })->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
+    }
+
+    public function weddingCelebration()
+    {
+        return response()->json(Product::where(function($q) {
+            $q->where('is_wedding_selected', true);
+        })->where('is_active', true)->with(['category', 'attributes.values.links.attribute', 'reviews'])->get());
     }
 
     public function bestsellers()
@@ -584,7 +598,7 @@ class ProductController extends Controller
                     'title' => $currentTitle,
                     'slug' => $slug,
                     'base_price' => $basePrice,
-                    'description' => $data['description'] ?? $data['Description'] ?? 'Handcrafted keepsake item.',
+                    'description' => $data['description'] ?? $data['Description'] ?? 'No description filled.',
                     'image' => $image,
                     'is_new_discovery' => $isNewDiscovery,
                     'is_wedding_special' => $isWeddingSpecial,

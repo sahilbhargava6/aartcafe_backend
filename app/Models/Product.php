@@ -17,6 +17,8 @@ class Product extends Model
         'images',
         'is_new_discovery',
         'is_wedding_special',
+        'is_wedding_featured',
+        'is_wedding_selected',
         'is_bestseller',
         'is_hero_featured',
         'is_free_delivery',
@@ -30,6 +32,13 @@ class Product extends Model
     protected static function booted(): void
     {
         static::saving(function (Product $product) {
+            // Keep is_wedding_featured and is_wedding_special in sync
+            if ($product->isDirty('is_wedding_featured')) {
+                $product->is_wedding_special = (bool) $product->is_wedding_featured;
+            } elseif ($product->isDirty('is_wedding_special')) {
+                $product->is_wedding_featured = (bool) $product->is_wedding_special;
+            }
+
             if ($product->isDirty(['is_festive_featured', 'is_festive_selected', 'is_festive_hidden'])) {
                 // Featured and Selected combine freely; Hidden (price on request) excludes both
                 if ($product->isDirty('is_festive_hidden') && $product->is_festive_hidden) {
@@ -56,6 +65,8 @@ class Product extends Model
         'images' => 'array',
         'is_new_discovery' => 'boolean',
         'is_wedding_special' => 'boolean',
+        'is_wedding_featured' => 'boolean',
+        'is_wedding_selected' => 'boolean',
         'is_bestseller' => 'boolean',
         'is_hero_featured' => 'boolean',
         'is_free_delivery' => 'boolean',

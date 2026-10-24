@@ -146,9 +146,21 @@ class OrderController extends Controller
         // over WhatsApp. Only honoured for products the admin actually set to Hidden.
         $priceOnRequest = $product->is_festive_hidden && !empty($item['price_on_request']);
 
+        $chosenAttributes = [];
+        foreach ($chosenValues as $value) {
+            [$attribute] = $optionsById[$value->id];
+            $chosenAttributes[] = [
+                'name'  => $attribute->name,
+                'value' => $value->value,
+            ];
+        }
+
         return [
             'product_id'       => $product->id,
+            'product_title'    => $product->title,
             'option_ids'       => array_values(array_unique($item['option_ids'] ?? [])),
+            'attributes'       => $chosenAttributes,
+            'is_free_delivery' => (bool) $product->is_free_delivery,
             'title'            => $product->title . ($chosen ? ' (' . implode(', ', $chosen) . ')' : ''),
             'price'            => $priceOnRequest ? 0 : round(max(0, $unitPrice), 2),
             'price_on_request' => $priceOnRequest,
