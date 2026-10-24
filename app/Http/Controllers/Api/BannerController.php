@@ -22,16 +22,24 @@ class BannerController extends Controller
         }
 
         $data = base64_decode(substr($image, strpos($image, ',') + 1), true);
-        $webp = null;
-        if ($data !== false) {
-            $tmp = tempnam(sys_get_temp_dir(), 'banner');
-            file_put_contents($tmp, $data);
-            try {
-                $webp = MediaStorage::webpFromUpload($tmp, 2000);
-            } finally {
-                @unlink($tmp);
-            }
+        if ($data === false) {
+            throw ValidationException::withMessages(['image_url' => 'The banner image could not be read. Please try another image.']);
         }
+
+        // If the uploaded banner is an animated GIF, preserve its animation frames
+        if (str_starts_with($image, 'data:image/gif') || str_starts_with($data, 'GIF87a') || str_starts_with($data, 'GIF89a')) {
+            return MediaStorage::store($data, $pathPrefix, 'gif');
+        }
+
+        $webp = null;
+        $tmp = tempnam(sys_get_temp_dir(), 'banner');
+        file_put_contents($tmp, $data);
+        try {
+            $webp = MediaStorage::webpFromUpload($tmp, 2000);
+        } finally {
+            @unlink($tmp);
+        }
+
         if ($webp === null) {
             throw ValidationException::withMessages(['image_url' => 'The banner image could not be read. Please try another image.']);
         }
