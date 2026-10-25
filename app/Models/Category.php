@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class Category extends Model
 {
-    protected $fillable = ['name', 'slug', 'parent_id'];
+    protected $fillable = ['name', 'slug', 'parent_id', 'image'];
 
     public function products()
     {

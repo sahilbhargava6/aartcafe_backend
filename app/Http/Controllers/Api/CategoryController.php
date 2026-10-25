@@ -4,12 +4,52 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
+    /**
+     * Store uploaded category image (base64 or URL) and return its public media link.
+     */
+    private function saveBase64Image($image, $pathPrefix = 'categories/')
+    {
+        if (empty($image)) {
+            return null;
+        }
+
+        if (!is_string($image) || !str_starts_with($image, 'data:image')) {
+            return $image;
+        }
+
+        $data = base64_decode(substr($image, strpos($image, ',') + 1), true);
+        if ($data === false) {
+            return null;
+        }
+
+        $webp = null;
+        $tmp = tempnam(sys_get_temp_dir(), 'category');
+        file_put_contents($tmp, $data);
+        try {
+            if (class_exists(\App\Support\MediaStorage::class)) {
+                $webp = MediaStorage::webpFromUpload($tmp, 800);
+            }
+        } catch (\Throwable $e) {
+            // fallback if GD/webp fails
+        } finally {
+            @unlink($tmp);
+        }
+
+        if ($webp !== null) {
+            return MediaStorage::store($webp, $pathPrefix, 'webp');
+        }
+
+        return MediaStorage::store($data, $pathPrefix, 'webp');
+    }
+
     public function index()
     {
         $categories = Category::with('parents:id')->withCount('products')->get();
@@ -25,6 +65,7 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string',
+            'image' => 'nullable|string',
             'parent_id' => 'nullable|exists:categories,id',
             'parent_ids' => 'sometimes|array',
             'parent_ids.*' => 'integer|distinct|exists:categories,id',
@@ -44,6 +85,13 @@ class CategoryController extends Controller
         } else {
             if (Category::where('slug', $validated['slug'])->exists()) {
                 return response()->json(['message' => 'The category slug already exists.'], 422);
+            }
+        }
+
+        if (array_key_exists('image', $validated)) {
+            $validated['image'] = $this->saveBase64Image($validated['image']);
+            if (!Schema::hasColumn('categories', 'image')) {
+                unset($validated['image']);
             }
         }
 
@@ -69,6 +117,7 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'slug' => 'sometimes|required|string|unique:categories,slug,' . $category->id,
+            'image' => 'nullable|string',
             'parent_id' => 'nullable|exists:categories,id',
             'parent_ids' => 'sometimes|array',
             'parent_ids.*' => 'integer|distinct|exists:categories,id',
@@ -77,6 +126,13 @@ class CategoryController extends Controller
         $parentIds = $request->has('parent_ids') || $request->exists('parent_id') ? $this->requestedParents($request) : null;
         if ($parentIds !== null && ($error = $this->parentError($parentIds, $category))) {
             return response()->json(['message' => $error], 422);
+        }
+
+        if (array_key_exists('image', $validated)) {
+            $validated['image'] = $this->saveBase64Image($validated['image']);
+            if (!Schema::hasColumn('categories', 'image')) {
+                unset($validated['image']);
+            }
         }
 
         try {
