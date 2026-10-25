@@ -598,7 +598,7 @@ class ProductController extends Controller
                     'title' => $currentTitle,
                     'slug' => $slug,
                     'base_price' => $basePrice,
-                    'description' => $data['description'] ?? $data['Description'] ?? 'No description filled.',
+                    'description' => $data['description'] ?? $data['Description'] ?? '❤️',
                     'image' => $image,
                     'is_new_discovery' => $isNewDiscovery,
                     'is_wedding_special' => $isWeddingSpecial,
