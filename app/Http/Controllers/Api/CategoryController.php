@@ -24,7 +24,7 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|unique:categories,slug',
+            'slug' => 'nullable|string',
             'parent_id' => 'nullable|exists:categories,id',
             'parent_ids' => 'sometimes|array',
             'parent_ids.*' => 'integer|distinct|exists:categories,id',
@@ -33,15 +33,30 @@ class CategoryController extends Controller
         $parentIds = $this->requestedParents($request);
 
         if (empty($validated['slug'])) {
-            $validated['slug'] = Str::slug($validated['name']);
+            $baseSlug = Str::slug($validated['name']) ?: 'category';
+            $slug = $baseSlug;
+            $counter = 1;
+            while (Category::where('slug', $slug)->exists()) {
+                $slug = "{$baseSlug}-{$counter}";
+                $counter++;
+            }
+            $validated['slug'] = $slug;
+        } else {
+            if (Category::where('slug', $validated['slug'])->exists()) {
+                return response()->json(['message' => 'The category slug already exists.'], 422);
+            }
         }
 
-        $category = DB::transaction(function () use ($validated, $parentIds) {
-            $category = Category::create(collect($validated)->except('parent_ids')->all());
-            $this->saveParents($category, $parentIds);
-            return $category;
-        });
-        return response()->json($category, 201);
+        try {
+            $category = DB::transaction(function () use ($validated, $parentIds) {
+                $category = Category::create(collect($validated)->except('parent_ids')->all());
+                $this->saveParents($category, $parentIds);
+                return $category;
+            });
+            return response()->json($category, 201);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function show(Category $category)
@@ -64,13 +79,17 @@ class CategoryController extends Controller
             return response()->json(['message' => $error], 422);
         }
 
-        DB::transaction(function () use ($category, $validated, $parentIds) {
-            $category->update(collect($validated)->except(['parent_ids', 'parent_id'])->all());
-            if ($parentIds !== null) {
-                $this->saveParents($category, $parentIds);
-            }
-        });
-        return response()->json($category);
+        try {
+            DB::transaction(function () use ($category, $validated, $parentIds) {
+                $category->update(collect($validated)->except(['parent_ids', 'parent_id'])->all());
+                if ($parentIds !== null) {
+                    $this->saveParents($category, $parentIds);
+                }
+            });
+            return response()->json($category);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /**
