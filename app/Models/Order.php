@@ -16,6 +16,7 @@ class Order extends Model
         'total_amount',
         'items',
         'reference_image',
+        'custom_request',
         'status',
     ];
 

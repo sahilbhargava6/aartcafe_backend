@@ -32,7 +32,12 @@ class OrderController extends Controller
             // Only used when it is one of the product's photos, so it is never rejected (some
             // product photos are long data: URLs)
             'items.*.image'        => 'nullable|string',
+            // What the customer typed for an item (names, dates, a note): kept with the order
+            'items.*.details'          => 'nullable|array|max:20',
+            'items.*.details.*.name'   => 'required|string|max:100',
+            'items.*.details.*.value'  => 'nullable|string|max:1000',
             'reference_image'      => 'nullable|string|max:1024',
+            'custom_request'       => 'nullable|string|max:2000',
         ]);
 
         // Prices, titles and the total are always computed here from the database;
@@ -61,6 +66,7 @@ class OrderController extends Controller
             'total_amount'    => round($total, 2),
             'items'           => $items,
             'reference_image' => $reference,
+            'custom_request'  => trim((string) ($validated['custom_request'] ?? '')) ?: null,
             'status'          => 'pending',
         ]);
 
@@ -153,6 +159,24 @@ class OrderController extends Controller
                 'name'  => $attribute->name,
                 'value' => $value->value,
             ];
+        }
+
+        // Text the customer typed (a text-box option such as names or a date, or a note). It
+        // never changes the price; options that are chosen from a list come from option_ids above.
+        $listAttributes = $product->attributes->where('type', '!=', 'text')->pluck('name')->map(fn ($n) => mb_strtolower(trim($n)))->all();
+        foreach ($item['details'] ?? [] as $detail) {
+            $name = trim((string) ($detail['name'] ?? ''));
+            $value = trim((string) ($detail['value'] ?? ''));
+            if ($name === '' || $value === '' || in_array(mb_strtolower($name), $listAttributes, true)) {
+                continue;
+            }
+            // Already listed (a text box left at its starting text is also sent as a chosen option)
+            foreach ($chosenAttributes as $existing) {
+                if ($existing['name'] === $name && $existing['value'] === $value) {
+                    continue 2;
+                }
+            }
+            $chosenAttributes[] = ['name' => $name, 'value' => $value];
         }
 
         return [

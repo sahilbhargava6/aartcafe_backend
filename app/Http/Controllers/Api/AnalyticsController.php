@@ -199,6 +199,9 @@ class AnalyticsController extends Controller
     }
 
     /**
+     * The calendar period so far, in shop time: Week = since Monday, Month = since the 1st,
+     * Year = since 1 January (so a new month starts again from zero).
+     *
      * @return array{0: Carbon, 1: Carbon, 2: string} start, end (shop time) and chart bucket
      */
     private function range(Request $request): array
@@ -207,10 +210,10 @@ class AnalyticsController extends Controller
 
         return match ($request->query('range', 'week')) {
             'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay(), 'hour'],
-            'month' => [$now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay(), 'day'],
-            'year'  => [$now->copy()->subMonths(11)->startOfMonth(), $now->copy()->endOfDay(), 'month'],
+            'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfDay(), 'day'],
+            'year'  => [$now->copy()->startOfYear(), $now->copy()->endOfDay(), 'month'],
             'custom' => $this->customRange($request, $now),
-            default => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay(), 'day'],
+            default => [$now->copy()->startOfWeek(Carbon::MONDAY), $now->copy()->endOfDay(), 'day'],
         };
     }
 
