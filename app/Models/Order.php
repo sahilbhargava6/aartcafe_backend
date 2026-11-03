@@ -17,6 +17,7 @@ class Order extends Model
         'items',
         'reference_image',
         'custom_request',
+        'admin_notes',
         'status',
     ];
 

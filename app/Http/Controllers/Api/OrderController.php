@@ -202,8 +202,10 @@ class OrderController extends Controller
     public function update(Request $request, $id)
     {
         $order = Order::findOrFail($id);
+        // The status, the shop's own notes, or both
         $validated = $request->validate([
-            'status' => 'required|string',
+            'status'      => 'sometimes|required|string',
+            'admin_notes' => 'sometimes|nullable|string|max:5000',
         ]);
 
         $order->update($validated);
