@@ -75,6 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::put('/orders/{id}', [OrderController::class, 'update']);
     Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
+    // The shop's own photos on an order
+    Route::post('/orders/{id}/photos', [OrderController::class, 'addAdminImage']);
+    Route::delete('/orders/{id}/photos', [OrderController::class, 'removeAdminImage']);
 
     // Products Write/Edit
     Route::post('/products', [ProductController::class, 'store']);

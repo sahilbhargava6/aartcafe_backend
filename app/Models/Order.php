@@ -18,11 +18,13 @@ class Order extends Model
         'reference_image',
         'custom_request',
         'admin_notes',
+        'admin_images',
         'status',
     ];
 
     protected $casts = [
         'items' => 'array',
+        'admin_images' => 'array',
         'total_amount' => 'decimal:2',
     ];
 }

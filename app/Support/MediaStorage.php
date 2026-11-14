@@ -45,6 +45,22 @@ class MediaStorage
         }
     }
 
+    /**
+     * Deletes a stored file given its public address (only files of ours under $pathPrefix).
+     */
+    public static function delete(?string $url, string $pathPrefix): void
+    {
+        if (!$url || !str_starts_with($url, self::url($pathPrefix))) return;
+        $path = urldecode(substr($url, strlen(self::url())));
+        foreach (array_unique([config('filesystems.default'), 'public']) as $disk) {
+            try {
+                Storage::disk($disk)->delete($path);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+    }
+
     public static function store(string $data, string $pathPrefix = 'products/', string $extension = 'webp'): string
     {
         $fileName = $pathPrefix . Str::random(24) . '.' . $extension;

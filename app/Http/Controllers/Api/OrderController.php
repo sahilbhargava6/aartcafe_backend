@@ -213,10 +213,64 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order updated successfully', 'order' => $order]);
     }
 
+    private const ADMIN_PHOTOS = 'order-photos/';
+    private const ADMIN_PHOTO_LIMIT = 30;
+
+    /**
+     * Adds one of the shop's own photos to an order (dashboard only). Stored as WebP, which also
+     * drops anything in the file that isn't image data.
+     */
+    public function addAdminImage(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+        $request->validate(['image' => 'required|file|image|max:15360'], [
+            'image.required' => 'Please choose a photo.',
+            'image.image'    => 'That file is not a photo. Please choose a JPG, PNG or WebP image.',
+            'image.max'      => 'That photo is too large (over 15 MB).',
+        ]);
+
+        $photos = $order->admin_images ?? [];
+        if (count($photos) >= self::ADMIN_PHOTO_LIMIT) {
+            throw ValidationException::withMessages(['image' => 'An order can have up to ' . self::ADMIN_PHOTO_LIMIT . ' photos. Remove one to add another.']);
+        }
+
+        $webp = MediaStorage::webpFromUpload($request->file('image')->getRealPath(), 2000);
+        if ($webp === null) {
+            throw ValidationException::withMessages(['image' => 'That file could not be read as a photo.']);
+        }
+
+        $photos[] = MediaStorage::store($webp, self::ADMIN_PHOTOS, 'webp');
+        $order->update(['admin_images' => array_values($photos)]);
+
+        return response()->json(['message' => 'Photo added', 'order' => $order], 201);
+    }
+
+    /** Removes one of the shop's photos from an order, and deletes the file. */
+    public function removeAdminImage(Request $request, $id)
+    {
+        $order = Order::findOrFail($id);
+        $validated = $request->validate(['url' => 'required|string|max:1024']);
+
+        $photos = $order->admin_images ?? [];
+        if (!in_array($validated['url'], $photos, true)) {
+            return response()->json(['message' => 'That photo is not on this order.'], 404);
+        }
+
+        $order->update(['admin_images' => array_values(array_filter($photos, fn ($url) => $url !== $validated['url']))]);
+        MediaStorage::delete($validated['url'], self::ADMIN_PHOTOS);
+
+        return response()->json(['message' => 'Photo removed', 'order' => $order]);
+    }
+
     public function destroy($id)
     {
         $order = Order::findOrFail($id);
+        $photos = $order->admin_images ?? [];
         $order->delete();
+        // The shop's own photos go with the order
+        foreach ($photos as $url) {
+            MediaStorage::delete($url, self::ADMIN_PHOTOS);
+        }
 
         return response()->json(['message' => 'Order deleted successfully']);
     }
