@@ -27,6 +27,7 @@ class Product extends Model
         'is_festive_selected',
         'is_festive_hidden',
         'is_special_offer',
+        'shop_position',
         'is_active'
     ];
 
@@ -76,6 +77,7 @@ class Product extends Model
         'is_festive_selected' => 'boolean',
         'is_festive_hidden' => 'boolean',
         'is_special_offer' => 'boolean',
+        'shop_position' => 'integer',
         'is_active' => 'boolean',
         'base_price' => 'decimal:2',
         'discount_price' => 'decimal:2'

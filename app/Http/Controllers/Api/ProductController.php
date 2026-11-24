@@ -153,6 +153,8 @@ class ProductController extends Controller
             'is_festive_selected' => 'nullable|boolean',
             'is_festive_hidden' => 'nullable|boolean',
             'is_special_offer' => 'nullable|boolean',
+            // Dashboard → Shop Top Picks: place at the top of the shop's "Featured" order (1 = first)
+            'shop_position' => 'nullable|integer|min:1|max:999',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
@@ -228,6 +230,8 @@ class ProductController extends Controller
             'is_festive_selected' => 'nullable|boolean',
             'is_festive_hidden' => 'nullable|boolean',
             'is_special_offer' => 'nullable|boolean',
+            // Dashboard → Shop Top Picks: place at the top of the shop's "Featured" order (1 = first)
+            'shop_position' => 'nullable|integer|min:1|max:999',
             'is_active' => 'nullable|boolean',
             'attributes' => 'nullable|array',
             'attributes.*.name' => 'nullable|string|max:255',
